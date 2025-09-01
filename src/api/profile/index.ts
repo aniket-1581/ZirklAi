@@ -1,0 +1,66 @@
+const BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1`;
+
+export async function getProfileStatus(token: string) {
+  const res = await fetch(`${BASE_URL}/onboarding/status`, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch profile status");
+  return res.json();
+}
+
+export async function setSyncContacts(token: string, contacts: any) {
+  const res = await fetch(`${BASE_URL}/profile/step/1`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "PATCH", // Use PATCH for partial updates
+    body: JSON.stringify(contacts),
+  });
+  if (!res.ok) throw new Error("Failed to update sync contacts");
+  return res.json();
+}
+
+export async function setPhoneContacts(token: string, data: any) {
+  const res = await fetch(`${BASE_URL}/profile/sync-contacts`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to set user details");
+  return res.json();
+}
+
+export async function getPhoneContacts(token: string) {
+  const res = await fetch(`${BASE_URL}/profile/contacts`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) throw new Error("Failed to set user details");
+  return res.json();
+}
+
+export async function createNote(token: string, notes: any[]) {
+  console.log("Creating note:", notes);
+  const res = await fetch(`${BASE_URL}/notes`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(notes),
+  });
+  if (!res.ok) throw new Error("Failed to create note");
+  return res.json();
+}
