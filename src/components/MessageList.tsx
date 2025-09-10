@@ -106,7 +106,7 @@ export default function MessageList({
               <TouchableOpacity onPress={onContactSelection} className="bg-[#444A8E] rounded-lg px-5 py-3 mt-4 flex-row items-center justify-between" disabled={item.next_step !== currentStep}>
                 <View className="flex-row items-center">
                   <MaterialIcons name="person-add" size={20} color="white" style={{ marginRight: 8 }} />
-                  <Text className="text-white text-start font-medium">Select contacts for your goal </Text>
+                  <Text className="text-white text-start font-medium">Select contacts for your </Text>
                 </View>
                 <MaterialIcons name="arrow-forward" size={20} color="white" />
               </TouchableOpacity>

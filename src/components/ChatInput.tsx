@@ -16,8 +16,8 @@ export default function ChatInput({
   isWaitingForResponse
 }: ChatInputProps) {
   return (
-    <View className='px-5' style={{ paddingBottom: 20}}>
-      <View className="flex-row items-center bg-white rounded-full px-5 py-1 shadow-sm border border-gray-100">
+    <View className='px-5'>
+      <View className="flex-row items-center bg-white rounded-full px-5 py-1 mb-4 shadow-sm border border-gray-100">
         <TextInput
           value={userInput}
           onChangeText={setUserInput}

@@ -1,7 +1,7 @@
+import CrystalSphereButton from '@/components/CrystalSphereButton';
 import { Fontisto, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
-import CrystalSphereButton from '@/components/CrystalSphereButton';
 
 
 export default function TabsLayout() {
@@ -13,7 +13,7 @@ export default function TabsLayout() {
                     headerShown: false,
                     tabBarStyle: hiddenRoute ? { display: 'none' } : { backgroundColor: '#FFFFFF', height: 80, paddingTop: 10 },
                     tabBarActiveTintColor: '#4725FC',
-                    tabBarInactiveTintColor: '#35383E',
+                    tabBarInactiveTintColor: '#35383E'
                 }
             }}
         >
@@ -54,7 +54,8 @@ export default function TabsLayout() {
                     tabBarLabel: '',
                     tabBarButton: (props) => (
                     <View style={{
-                        alignSelf: 'center'
+                        alignSelf: 'center',
+                        bottom: 30,
                     }}>
                         <CrystalSphereButton onPress={props.onPress} />
                     </View>

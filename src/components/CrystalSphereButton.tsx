@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-const SIZE = 60; // increased size for a more "orb" feel
+const SIZE = 80; // increased size for a more "orb" feel
 
 const COLORS = {
   primary: 'rgba(147, 51, 234, 1)', // vibrant purple

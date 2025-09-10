@@ -13,6 +13,8 @@ import Toast from 'react-native-toast-message';
 import { login as apiLogin, getUser, verifyOtp } from '@/api/auth';
 import { getOnboardingStatus, OnboardingStatusResponse } from '@/api/onboarding';
 import { registerAndSendFcmToken } from '@/api/notifications';
+import { createCallLogs } from '@/api/call-logs';
+import CallLogService from '@/utils/CallLogService';
 
 interface User {
   id: string;
@@ -117,12 +119,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token])
 
+  const syncCallLogsToServer = useCallback(async () => {
+    if (!token) return;
+  
+    const callLogService = CallLogService.getInstance();
+    
+    try {
+      const result = await callLogService.getCallLogs(100);
+      if (result.success && result.data) {
+        const logsToSave = result.data
+          .filter(log => log.type === 'INCOMING' || log.type === 'OUTGOING' || log.type === 'MISSED') // Only save relevant types
+          .map(log => ({
+            dateTime: log.dateTime,
+            duration: log.duration,
+            name: log.name || 'Unknown',
+            phoneNumber: log.phoneNumber,
+            timestamp: log.timestamp,
+            type: log.type as 'INCOMING' | 'OUTGOING' | 'MISSED',
+          }));
+  
+        if (logsToSave.length > 0) {
+          await createCallLogs(logsToSave);
+          console.log('Call logs synced successfully.');
+        } else {
+          console.log('No call logs to sync.');
+        }
+      } else {
+        console.warn('Failed to fetch call logs:', result.error);
+      }
+    } catch (err) {
+      console.error('Error syncing call logs:', err);
+    }
+  }, [token]);
+  
+
   useEffect(() => {
     if (!ready) return;
     if (token) {
       getUserDetails();
       getProfileSetupStatus();
       getNotificationToken()
+      syncCallLogsToServer();
     } else {
       setUser(null);
       setProfileSetupStatus(null);

@@ -20,7 +20,7 @@ export default function Home() {
         try {
             const notes = await getNotes(token!) as any[];
             const validNotes = Array.isArray(notes) ? notes.filter(note => note && typeof note === 'object') : [];
-            setContacts(validNotes.slice(0, 5));
+            setContacts(validNotes);
         } catch (e) {
             console.error('Error fetching notes:', e);
             setError('Failed to load opportunities');

@@ -11,30 +11,33 @@ export async function getGlobalChatHistory(token: string) {
     return res.json();
 }
 
-export async function getWelcomeMessage() {
+export async function getWelcomeMessage(token: string) {
     const res = await fetch(`${BASE_URL}/global-chat/welcome-message`, {
         headers: {
             'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
     });
     if (!res.ok) throw new Error('Failed to fetch welcome message');
     return res.json();
 }
 
-export async function getReturningMessage() {
+export async function getReturningMessage(token: string) {
     const res = await fetch(`${BASE_URL}/global-chat/returning-message`, {
         headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
     });
     if (!res.ok) throw new Error('Failed to fetch returning message');
     return res.json();
 }
 
-export async function getLoadingMessage() {
+export async function getLoadingMessage(token: string) {
     const res = await fetch(`${BASE_URL}/global-chat/loading-messages`, {
         headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
     });
     if (!res.ok) throw new Error('Failed to fetch loading message');

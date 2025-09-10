@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mettasocial.ZirklAi",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSContactsUsageDescription": "This app uses your contacts to help you connect and interact with people you know."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +26,8 @@
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "READ_CONTACTS",
-        "WRITE_CONTACTS"
+        "WRITE_CONTACTS",
+        "READ_CALL_LOG"
       ]
     },
     "web": {

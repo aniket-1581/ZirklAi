@@ -185,7 +185,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View>
           <Text className='text-black text-[22px] font-bold'>{note?.contact_name}</Text>
-          <Text className='text-[#B0B0B0] text-sm'>{note?.goals[0]?.text}</Text>
+          <Text className='text-[#B0B0B0] text-sm'>{note?.goal}</Text>
         </View>
       </View>
       {/* Chat */}

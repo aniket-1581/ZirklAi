@@ -57,8 +57,6 @@ class ContactSyncService {
         fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       });
   
-      console.log("[ContactSync] Total fetched:", result.data.length); // <-- Debug log
-  
       if (!result || !Array.isArray(result.data)) {
         return {
           success: false,

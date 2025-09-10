@@ -1,6 +1,6 @@
 import ChatInput from '@/components/ChatInput';
 import LoadingIndicator from '@/components/LoadingIndicator';
-import MessageList from '@/components/MessageList';
+import GlobalMessageList from '@/components/GlobalMessageList';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
@@ -18,9 +18,9 @@ export default function GlobalChatScreen() {
     userInput,
     isLoading,
     isWaitingForResponse,
-    loadingMessages,
     setUserInput,
     handleTextSubmit,
+    loadingMessages
   } = useGlobalChat();
 
   useEffect(() => {
@@ -42,17 +42,12 @@ export default function GlobalChatScreen() {
 
           <View style={{ flex: 1, gap: 16 }}>
             <View style={{ flex: 1 }}>
-              <LoadingIndicator isLoading={isLoading} />
-              <MessageList
+              <LoadingIndicator isLoading={isLoading} message='Setting up your global chat...' />
+              <GlobalMessageList
                 messages={messages}
                 isWaitingForResponse={isWaitingForResponse}
                 onOptionSelect={() => {}}
-                onContactSync={() => {}}
-                onContactSelection={() => {}}
-                onComplete={() => {}}
                 flatListRef={flatListRef}
-                handleGetLocation={() => {}}
-                locating={false}
                 currentStep={''}
               />
               <TypingIndicator isWaitingForResponse={isWaitingForResponse} />

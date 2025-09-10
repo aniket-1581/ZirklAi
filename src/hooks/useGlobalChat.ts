@@ -37,7 +37,7 @@ export function useGlobalChat() {
       } else {
         // If no history, try welcome/returning message fallbacks
         try {
-          const welcome = await getWelcomeMessage();
+          const welcome = await getWelcomeMessage(token);
           const welcomeMsgs = normalizeMessages(welcome);
           if (welcomeMsgs.length > 0) {
             setMessages(welcomeMsgs);
@@ -73,7 +73,7 @@ export function useGlobalChat() {
       (async () => {
         try {
           setLoadingMessages([]);
-          const loading = await getLoadingMessage();
+          const loading = await getLoadingMessage(token);
           const msgs = normalizeMessages(loading) as any[];
           if (Array.isArray(msgs) && msgs.length > 0) {
             for (let i = 0; i < msgs.length; i++) {

@@ -60,6 +60,8 @@ const LoginScreen = () => {
                             value={phoneNumber}
                             onChangeText={setPhoneNumber}
                             className="flex-1 px-5 py-3 text-lg text-black"
+                            maxLength={10}
+                            autoFocus={true}
                         />
                     </View>
 
