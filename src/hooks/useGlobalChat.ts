@@ -26,23 +26,29 @@ export function useGlobalChat() {
     return [];
   };
 
+  const loadWelcomeMessage = async () => {
+    try {
+      await getWelcomeMessage(token as string);
+    } catch (err) {
+      console.error('Welcome message failed:', err);
+    }
+  };
+
   const loadHistory = useCallback(async () => {
     if (!token) return;
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const history = await getGlobalChatHistory(token);
       const normalized = normalizeMessages(history);
       if (normalized.length > 0) {
-        setMessages(normalized);
+        setMessages([...normalized]); // Force render
       } else {
-        // If no history, try welcome/returning message fallbacks
-        try {
-          const welcome = await getWelcomeMessage(token);
-          const welcomeMsgs = normalizeMessages(welcome);
-          if (welcomeMsgs.length > 0) {
-            setMessages(welcomeMsgs);
-          }
-        } catch {}
+        await loadWelcomeMessage();
+        const history = await getGlobalChatHistory(token);
+        const normalized = normalizeMessages(history);
+        if (normalized.length > 0) {
+          setMessages(normalized);
+        }
       }
     } catch (error) {
       console.error('Failed to load global chat history:', error);

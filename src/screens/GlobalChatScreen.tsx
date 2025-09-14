@@ -46,7 +46,10 @@ export default function GlobalChatScreen() {
               <GlobalMessageList
                 messages={messages}
                 isWaitingForResponse={isWaitingForResponse}
-                onOptionSelect={() => {}}
+                onOptionSelect={(option) => {
+                  const text = typeof option === "string" ? option : option.text;
+                  setUserInput(text);
+                }}
                 flatListRef={flatListRef}
                 currentStep={''}
               />
