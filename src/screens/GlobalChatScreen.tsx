@@ -42,7 +42,7 @@ export default function GlobalChatScreen() {
           </View>
 
           <View style={{ flex: 1, gap: 16 }}>
-            <View style={{ flex: 1 }}>
+            <View className='flex-1 mx-5'>
               <LoadingIndicator isLoading={isLoading} message='Setting up your global chat...' />
               <GlobalMessageList
                 messages={messages}

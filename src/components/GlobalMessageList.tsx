@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { Message, Option } from '../types';
+import { formatUtcToIstTime } from '@/utils/date'; 
 
 interface MessageListProps {
   messages: Message[];
@@ -49,9 +50,7 @@ export default function GlobalMessageList({
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
-    const hours12 = new Date(item.timestamp).getHours() % 12 || 12;
-    const ampm = new Date(item.timestamp).getHours() >= 12 ? 'PM' : 'AM';
-    const time12 = `${hours12.toString().padStart(2, '0')}:${new Date(item.timestamp).getMinutes().toString().padStart(2, '0')} ${ampm}`;
+    const time12 = formatUtcToIstTime(item.timestamp);
     const isAssistant = item.role === 'assistant';
     const content = item.content || '';
 
@@ -87,9 +86,9 @@ export default function GlobalMessageList({
       // If we found any special formatting, use the complex renderer
       if (isComplexAssistantMessage || adviceOrTips.length > 0) {
         return (
-          <View className={`flex-col items-start mb-4 px-4`}>
+          <View className={`flex-col items-start mb-4`}>
           {introText && (
-            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-2">
+            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
               <Text className="text-black text-base">{introText}</Text>
             </View>
           )}
@@ -101,7 +100,7 @@ export default function GlobalMessageList({
             return (
               <View
                 key={idx}
-                className="max-w-[85%] flex-row items-start mb-2 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
+                className="max-w-[85%] flex-row items-start mb-3 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
               >
                 <View style={{ flex: 1 }}>
                   {renderFormattedText(trimmedMsg)}
@@ -139,7 +138,7 @@ export default function GlobalMessageList({
     if (isAssistant && item.options && item.type === 'flow') {
       return (
         <View className={`flex-col items-start mb-4`}>
-          <View className="max-w-[85%] mx-4 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-3">
+          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
             <Text className="text-lg font-semibold mb-3">
               {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
             </Text>
@@ -171,7 +170,7 @@ export default function GlobalMessageList({
     } else if (isAssistant && item.options && item.type === 'option') {
       return (
         <View className={`flex-col items-start mb-4`}>
-          <View className="max-w-[85%] mx-4 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-3">
+          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
             <Text className="text-black text-base mb-3">
               {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
             </Text>
@@ -199,7 +198,7 @@ export default function GlobalMessageList({
       // Normal single message (user or assistant)
       return (
         <View className={`flex-row ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start mb-4`}>
-          <View className={`max-w-[85%] mx-4 border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
+          <View className={`max-w-[85%] border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
             <Text className={`text-black text-base`}>{item.content}</Text>
             <Text className='text-black text-xs text-right'>{time12}</Text>
           </View>
@@ -241,7 +240,6 @@ export default function GlobalMessageList({
     <FlatList
       data={messages}
       keyExtractor={(_, idx) => idx.toString()}
-      className='flex-1 px-5 pt-4'
       showsVerticalScrollIndicator={false}
       ref={flatListRef}
       keyboardShouldPersistTaps='handled'

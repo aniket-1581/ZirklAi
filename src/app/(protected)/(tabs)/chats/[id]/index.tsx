@@ -2,6 +2,7 @@ import { chatWithLlm, getLoadingMessage, getNoteChatHistory, getReturningMessage
 import { getNoteById } from '@/api/notes';
 import { useAuth } from '@/context/AuthContext';
 import { ImageIcons } from '@/utils/ImageIcons';
+import { formatUtcToIstTime } from '@/utils/date';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -151,9 +152,7 @@ export default function ChatScreen() {
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
-    const hours12 = new Date(item.timestamp).getHours() % 12 || 12;
-    const ampm = new Date(item.timestamp).getHours() >= 12 ? 'PM' : 'AM';
-    const time12 = `${hours12.toString().padStart(2, '0')}:${new Date(item.timestamp).getMinutes().toString().padStart(2, '0')} ${ampm}`;
+    const time12 = formatUtcToIstTime(item.timestamp);
 
     const isAssistant = item.role === 'assistant';
     const content = item.content || '';
@@ -254,7 +253,7 @@ export default function ChatScreen() {
         </View>
       </View>
       {/* Chat */}
-      <View className="flex-1 mx-4">
+      <View className="flex-1 mx-5">
         <FlatList
           ref={flatListRef}
           data={messages}
