@@ -4,7 +4,6 @@ import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { Message, Option } from '../types';
-import LoadingIndicator from './LoadingIndicator';
 
 interface MessageListProps {
   messages: Message[];
@@ -104,15 +103,15 @@ export default function GlobalMessageList({
                 className="max-w-[85%] flex-row items-start mb-3 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
               >
                 <View style={{ flex: 1 }}>
-                  {renderFormattedText(trimmedMsg)}
+                  <Text className="text-black text-base pr-5">{renderFormattedText(trimmedMsg)}</Text>
+                  <Text className='text-black text-xs mt-2 text-right'>{time12}</Text>
                 </View>
                 <TouchableOpacity
-                  className="ml-2 mt-1"
+                  className="absolute right-5 top-3" 
                   onPress={() => handleCopy(trimmedMsg, copyKey)}
                 >
                   <MaterialIcons name={isCopied ? "check" : "content-copy"} size={18} color={isCopied ? "green" : "#60646D"} />
                 </TouchableOpacity>
-                <Text className='absolute text-black text-xs mt-2 right-5 bottom-3'>{time12}</Text>
               </View>
             );
           })}

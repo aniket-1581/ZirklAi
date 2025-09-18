@@ -1,6 +1,5 @@
 import { chatWithLlm, getLoadingMessage, getNoteChatHistory, getReturningMessage, getWelcomeMessage, postNoteChatHistory } from '@/api/chat';
 import { getNoteById } from '@/api/notes';
-import LoadingIndicator from '@/components/LoadingIndicator';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useAuth } from '@/context/AuthContext';
 import { ImageIcons } from '@/utils/ImageIcons';
@@ -88,7 +87,7 @@ export default function ChatScreen() {
         } else {
           const lastMessage = chatHistory.messages[chatHistory.messages.length - 1];
           // Only show a returning message if the user was the last one to speak.
-          if (lastMessage && lastMessage.role === 'user') {
+          if (lastMessage && lastMessage.type !== 'loading' && lastMessage.role !== 'user' && lastMessage.timestamp.split('T')[0] !== new Date().toISOString().split('T')[0]) {
             const returningMsg = await getReturningMessage() as any;
             if (returningMsg && returningMsg.message) {
               const updatedMessages = [
@@ -96,7 +95,8 @@ export default function ChatScreen() {
                 {
                   role: 'assistant',
                   content: returningMsg.message,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  type: 'loading'
                 }
               ];
               setMessages(updatedMessages);
@@ -160,6 +160,7 @@ export default function ChatScreen() {
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
     const time12 = formatUtcToIstTime(item.timestamp);
+    console.log('Time in IST:', time12);
 
     const isAssistant = item.role === 'assistant';
     const content = item.content || '';
@@ -222,6 +223,7 @@ export default function ChatScreen() {
                 <View key={`tip-${idx}`} className="w-full flex-row items-start mb-2">
                   <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-xl px-5 py-3">
                     <View style={{ flex: 1 }}>{renderFormattedText(trimmedTip)}</View>
+                    <Text className='text-black text-xs mt-2 text-right'>{time12}</Text>
                   </View>
                 </View>
               );
