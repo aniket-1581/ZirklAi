@@ -5,7 +5,7 @@ import {
   globalChatWithLlm,
 } from '@/api/global-chat';
 import { useAuth } from '@/context/AuthContext';
-import { Message } from '@/types';
+import { Message, Option } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
@@ -19,11 +19,24 @@ export function useGlobalChat() {
   const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
 
   const normalizeMessages = (data: any): Message[] => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data as Message[];
-    if (Array.isArray(data?.conversations)) return data.conversations as Message[];
-    if (Array.isArray(data?.messages)) return data.messages as Message[];
-    return [];
+    console.log("Normalizing messages:", data);
+    if (!data) {
+      return [];
+    }
+
+    let messageList: any[] = [];
+    if (Array.isArray(data)) {
+      messageList = data;
+    } else if (Array.isArray(data.conversations)) {
+      messageList = data.conversations;
+    } else if (Array.isArray(data.messages)) {
+      messageList = data.messages;
+    }
+
+    // Ensure all items are objects with a 'content' property
+    return messageList.map((item) =>
+      typeof item === 'string' ? { role: 'assistant', content: item, timestamp: new Date() } : item
+    );
   };
 
   const loadWelcomeMessage = async () => {
@@ -39,12 +52,14 @@ export function useGlobalChat() {
     setIsLoading(true);
     try {
       const history = await getGlobalChatHistory(token);
+      console.log("Fetched history:", history);
       const normalized = normalizeMessages(history);
       if (normalized.length > 0) {
-        setMessages([...normalized]); // Force render
+        setMessages([...normalized]);
       } else {
         await loadWelcomeMessage();
         const history = await getGlobalChatHistory(token);
+        console.log("Fetched history after welcome message:", history);
         const normalized = normalizeMessages(history);
         if (normalized.length > 0) {
           setMessages(normalized);
@@ -58,9 +73,10 @@ export function useGlobalChat() {
     }
   }, [token]);
 
-  const handleTextSubmit = async () => {
-    if (!token || !userInput.trim() || isWaitingForResponse) return;
-    const input = userInput.trim();
+  const handleTextSubmit = async (text?: string) => {
+    const input = text || userInput.trim();
+    if (!token || !input || isWaitingForResponse) return;
+
     setUserInput('');
     setIsWaitingForResponse(true);
 
@@ -79,12 +95,12 @@ export function useGlobalChat() {
       (async () => {
         try {
           setLoadingMessages([]);
-          const loading = await getLoadingMessage(token);
-          const msgs = normalizeMessages(loading) as any[];
+          const loadingResponse = await getLoadingMessage(token);
+          const msgs = loadingResponse?.messages || [];
           if (Array.isArray(msgs) && msgs.length > 0) {
             for (let i = 0; i < msgs.length; i++) {
               await new Promise((res) => setTimeout(res, 1000));
-              setLoadingMessages((prev) => [...prev, (msgs[i] as any).content ?? String(msgs[i])]);
+              setLoadingMessages((prev) => [...prev, String(msgs[i])]);
             }
           }
         } catch {
@@ -104,6 +120,15 @@ export function useGlobalChat() {
     }
   };
 
+  const handleOptionSelect = async (option: string | Option) => {
+    if (!token || isWaitingForResponse) return;
+
+    const text = typeof option === 'string' ? option : (option as any).title;
+
+    // We can reuse the logic from handleTextSubmit
+    await handleTextSubmit(text);
+  };
+
   useEffect(() => {
     if (token) {
       loadHistory();
@@ -118,7 +143,6 @@ export function useGlobalChat() {
     loadingMessages,
     setUserInput,
     handleTextSubmit,
+    handleOptionSelect,
   };
 }
-
-

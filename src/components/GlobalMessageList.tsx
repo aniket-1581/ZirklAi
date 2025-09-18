@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList } from 'react-native';
-import { Message, Option } from '../types';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { FocusCard } from "./FocusCard";
+import React, { useEffect, useState } from 'react';
+import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { Message, Option } from '../types';
 
 interface MessageListProps {
   messages: Message[];
@@ -20,58 +19,187 @@ export default function GlobalMessageList({
   flatListRef,
   currentStep
 }: MessageListProps) {
+  const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
+
+  const handleCopy = (text: string, key: string) => {
+    Clipboard.setStringAsync(text);
+    setCopiedStates((prev) => ({ ...prev, [key]: true }));
+    setTimeout(() => {
+      setCopiedStates((prev) => ({ ...prev, [key]: false }));
+    }, 3000);
+  };
+
+  const renderFormattedText = (text: string) => {
+    const parts = text.split(/(\*.*?\*)/g);
+    return (
+      <Text className="text-black text-base">
+        {parts.map((part, index) => {
+          if (part.startsWith('*') && part.endsWith('*')) {
+            return (
+              <Text key={index} className="font-bold">
+                {part.slice(1, -1)}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  };
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
     const hours12 = new Date(item.timestamp).getHours() % 12 || 12;
     const ampm = new Date(item.timestamp).getHours() >= 12 ? 'PM' : 'AM';
     const time12 = `${hours12.toString().padStart(2, '0')}:${new Date(item.timestamp).getMinutes().toString().padStart(2, '0')} ${ampm}`;
-
     const isAssistant = item.role === 'assistant';
+    const content = item.content || '';
 
-    // Match all occurrences of "Message X:"
-    const messageMatch = item.content.match(/Message \d+:/g);
+    // --- Parsing Logic ---
+    let isComplexAssistantMessage = false;
+    if (isAssistant && typeof content === 'string') {
+      let introText = '';
+      let suggestionMessages: string[] = [];
+      let adviceOrTips: string[] = [];
 
-    const isSuggestionGroup = isAssistant && messageMatch && messageMatch.length >= 3;
+      // Regex to split by "For..." or "Coach Tip:". It looks for one or more newlines.
+      const adviceSplitRegex = /\n+(?=For |Coach Tip:)/g;
+      const contentParts = content.split(adviceSplitRegex);
+      let mainContent = contentParts[0];
+      adviceOrTips = contentParts.slice(1).map(p => p.trim());
 
-    if (isAssistant && index === 0) {
+      // Regex for numbered lists (handles single or double newlines) and message groups
+      const numberedListRegex = /\n+(?=\d+\.\s)/g;
+      const messageGroupRegex = /(?=Message \d+:)/g;
+
+      if (mainContent.match(messageGroupRegex)) {
+        suggestionMessages = mainContent.split(messageGroupRegex).filter((msg: string) => msg.trim());
+        isComplexAssistantMessage = true;
+      } else if (mainContent.match(numberedListRegex)) {
+        const numberedListParts = mainContent.split(numberedListRegex);
+        introText = numberedListParts[0].trim();
+        suggestionMessages = numberedListParts.slice(1).map((p: string) => p.trim());
+        isComplexAssistantMessage = true;
+      } else {
+        introText = mainContent.trim();
+      }
+
+      // If we found any special formatting, use the complex renderer
+      if (isComplexAssistantMessage || adviceOrTips.length > 0) {
+        return (
+          <View className={`flex-col items-start mb-4 px-4`}>
+          {introText && (
+            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-2">
+              <Text className="text-black text-base">{introText}</Text>
+            </View>
+          )}
+          {suggestionMessages.map((msg: string, idx: number) => {
+            const copyKey = `msg-${index}-${idx}`;
+            const isCopied = copiedStates[copyKey];
+            const trimmedMsg = msg.trim();
+
+            return (
+              <View
+                key={idx}
+                className="max-w-[85%] flex-row items-start mb-2 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
+              >
+                <View style={{ flex: 1 }}>
+                  {renderFormattedText(trimmedMsg)}
+                </View>
+                <TouchableOpacity
+                  className="ml-2 mt-1"
+                  onPress={() => handleCopy(trimmedMsg, copyKey)}
+                >
+                  <MaterialIcons name={isCopied ? "check" : "content-copy"} size={18} color={isCopied ? "green" : "#60646D"} />
+                </TouchableOpacity>
+                <Text className='absolute text-black text-xs mt-2 right-5 bottom-3'>{time12}</Text>
+              </View>
+            );
+          })}
+          {adviceOrTips.map((tip: string, idx: number) => {
+            const copyKey = `tip-${index}-${idx}`;
+            const isCopied = copiedStates[copyKey];
+            const trimmedTip = tip.trim();
+            return (
+              <View key={`tip-${idx}`} className="w-full flex-row items-start mb-2">
+                <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-xl px-5 py-3">
+                  <View style={{ flex: 1 }}>
+                    {renderFormattedText(trimmedTip)}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        );
+      }
+    }
+    
+    // --- Fallback and other message type rendering ---
+    if (isAssistant && item.options && item.type === 'flow') {
       return (
-        <View>
-          <FocusCard onSelect={(opt) => onOptionSelect(opt)} message={item.content} />
+        <View className={`flex-col items-start mb-4`}>
+          <View className="max-w-[85%] mx-4 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-3">
+            <Text className="text-lg font-semibold mb-3">
+              {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
+            </Text>
+
+            <View className="flex-row flex-wrap justify-between">
+              {item?.options?.map((opt: any, index: number) => {
+                const cardClasses = opt.enabled
+                  ? "bg-white border border-gray-300"
+                  : "bg-gray-50 border border-gray-200 opacity-50";
+
+                return (
+                  <TouchableOpacity
+                    key={index} 
+                    onPress={() => onOptionSelect(opt)}
+                    disabled={!opt.enabled}
+                    className={`w-[48%] mb-3 rounded-xl p-3 ${cardClasses}`}
+                  >
+                    <Text className="text-2xl">{opt.emoji}</Text>
+                    <Text className="font-semibold text-base">{opt.title}</Text>
+                    <Text className="text-xs text-gray-500">{opt.subtitle}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text className='text-black text-xs text-right mt-2'>{time12}</Text>
+          </View>
         </View>
       );
-    }
-
-    if (isSuggestionGroup) {
-      // Split the message into each "Message X: ..." part
-      const suggestionMessages = item.content.split(/(?=Message \d+:)/g).filter((msg: string) => msg.trim());
-
+    } else if (isAssistant && item.options && item.type === 'option') {
       return (
-        <View className={`flex-col items-start mb-4 px-4`}>
-          {suggestionMessages.map((msg: string, idx: number) => (
-            <View
-              key={idx}
-              className="max-w-[75%] flex-row items-start mb-2 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
-            >
-              <View style={{ flex: 1 }}>
-                <Text className='text-black text-base'>{msg.trim()}</Text>
-                <Text className='text-black text-xs text-right'>{item.timestamp}</Text>
-              </View>
-              <TouchableOpacity
-                className="ml-2 mt-1"
-                onPress={() => Clipboard.setStringAsync(msg.trim())}
-              >
-                <MaterialIcons name="content-copy" size={18} color="#60646D" />
-              </TouchableOpacity>
+        <View className={`flex-col items-start mb-4`}>
+          <View className="max-w-[85%] mx-4 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-3">
+            <Text className="text-black text-base mb-3">
+              {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
+            </Text>
+            <View className="flex-row flex-wrap justify-between">
+              {item?.options?.map((opt: any, index: number) => {
+                const cardClasses = "bg-white border border-gray-300";
+
+                return (
+                  <TouchableOpacity
+                    key={index} 
+                    onPress={() => onOptionSelect(opt)}
+                    className={`w-[48%] mb-3 rounded-xl p-3 ${cardClasses}`}
+                  >
+                    <Text className="font-semibold text-base">{opt.title}</Text>
+                    <Text className="text-xs text-gray-500">{opt.contact_number}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          ))}
+          </View>
+          <Text className='text-black text-xs text-right'>{time12}</Text>
         </View>
       );
     } else {
       // Normal single message (user or assistant)
       return (
         <View className={`flex-row ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start mb-4`}>
-          <View className={`max-w-[75%] mx-4 border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
+          <View className={`max-w-[85%] mx-4 border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
             <Text className={`text-black text-base`}>{item.content}</Text>
             <Text className='text-black text-xs text-right'>{time12}</Text>
           </View>

@@ -113,7 +113,6 @@ export default function Home() {
                                 <View className="flex-row items-center">
                                     <View>
                                         <Text className="font-semibold text-base text-black">{item.contact_name || 'Unknown Contact'}</Text>
-                                        <Text className="text-sm text-gray-500">{item?.work_profession || 'No profession listed'}</Text>
                                     </View>
                                 </View>
                                 <View className="bg-yellow-400 rounded-full px-2 py-1">
@@ -122,9 +121,6 @@ export default function Home() {
                                     </Text>
                                 </View>
                             </View>
-
-                            {/* Message */}
-                            {item.content && <Text className="text-sm text-black mt-2">{item.content.slice(0, 100)}...</Text>}
                             <View className="flex-row items-center mt-2">
                                 <Text className="text-lg mr-2">💡</Text>
                                 <Text className="text-sm text-gray-600">

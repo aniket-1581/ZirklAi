@@ -1,6 +1,6 @@
 import ChatInput from '@/components/ChatInput';
-import LoadingIndicator from '@/components/LoadingIndicator';
 import GlobalMessageList from '@/components/GlobalMessageList';
+import LoadingIndicator from '@/components/LoadingIndicator';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
@@ -20,7 +20,8 @@ export default function GlobalChatScreen() {
     isWaitingForResponse,
     setUserInput,
     handleTextSubmit,
-    loadingMessages
+    loadingMessages,
+    handleOptionSelect,
   } = useGlobalChat();
 
   useEffect(() => {
@@ -46,17 +47,14 @@ export default function GlobalChatScreen() {
               <GlobalMessageList
                 messages={messages}
                 isWaitingForResponse={isWaitingForResponse}
-                onOptionSelect={(option) => {
-                  const text = typeof option === "string" ? option : option.text;
-                  setUserInput(text);
-                }}
+                onOptionSelect={handleOptionSelect}
                 flatListRef={flatListRef}
                 currentStep={''}
               />
               <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
 
               {/* Transient loading messages while waiting for LLM */}
-              {loadingMessages.length > 0 && !isLoading && (
+              {loadingMessages.length > 0 && isLoading && (
                 <View className="px-5">
                   {loadingMessages.map((msg, idx) => (
                     <View key={`loading-${idx}`} className="mb-2 items-start">
@@ -73,7 +71,7 @@ export default function GlobalChatScreen() {
               <ChatInput
                 userInput={userInput}
                 setUserInput={setUserInput}
-                onTextSubmit={handleTextSubmit}
+                onTextSubmit={() => handleTextSubmit()}
                 isWaitingForResponse={isWaitingForResponse}
               />
             </KeyboardAvoidingView>
@@ -83,5 +81,3 @@ export default function GlobalChatScreen() {
     </View>
   );
 }
-
-
