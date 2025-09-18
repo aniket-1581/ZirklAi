@@ -1,5 +1,7 @@
 import { chatWithLlm, getLoadingMessage, getNoteChatHistory, getReturningMessage, getWelcomeMessage, postNoteChatHistory } from '@/api/chat';
 import { getNoteById } from '@/api/notes';
+import LoadingIndicator from '@/components/LoadingIndicator';
+import TypingIndicator from '@/components/TypingIndicator';
 import { useAuth } from '@/context/AuthContext';
 import { ImageIcons } from '@/utils/ImageIcons';
 import { formatUtcToIstTime } from '@/utils/date';
@@ -13,7 +15,9 @@ export default function ChatScreen() {
   const { id, draftMessage } = useLocalSearchParams<{ id: string; draftMessage?: string }>();
   const [messages, setMessages] = useState<any[]>([]);
   const [message, setMessage] = useState(draftMessage || '');
+  const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const flatListRef = useRef(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { token } = useAuth();
@@ -119,34 +123,37 @@ export default function ChatScreen() {
       ...messages,
       { role: 'user', content: message, timestamp: new Date().toISOString() }
     ];
+    setIsWaitingForResponse(true);
     setMessages(newMessages);
     setMessage('');
 
-    let loadingMsgObj = null;
     try {
-      const loadingMsg = await getLoadingMessage() as any;
-      let loadingText = 'Loading...';
-      if (loadingMsg && Array.isArray(loadingMsg.messages) && loadingMsg.messages.length > 0) {
-        loadingText = loadingMsg.messages[Math.floor(Math.random() * loadingMsg.messages.length)];
+      setLoadingMessages([]);
+      const loadingResponse = await getLoadingMessage();
+      const msgs = loadingResponse?.messages || [];
+      if (Array.isArray(msgs) && msgs.length > 0) {
+        for (let i = 0; i < msgs.length; i++) {
+          await new Promise((res) => setTimeout(res, 1000));
+          setLoadingMessages((prev) => [...prev, String(msgs[i])]);
+        }
       }
-      loadingMsgObj = { role: 'assistant', content: loadingText, timestamp: new Date().toISOString() };
-      setMessages([...newMessages, loadingMsgObj]);
     } catch {
-      loadingMsgObj = { role: 'assistant', content: 'Loading...', timestamp: new Date().toISOString() };
-      setMessages([...newMessages, loadingMsgObj]);
+      console.warn('Loading messages fetch failed');
     }
 
     try {
       const ollamaRes = await chatWithLlm(message, note?.content || '', id as string, token!) as any;
+      // Replace loading indicator with the actual response
       if (ollamaRes && ollamaRes.response) {
-        const updatedMessages = [
-          ...newMessages,
-          { role: 'assistant', content: ollamaRes.response, timestamp: new Date().toISOString() }
-        ];
-        setMessages(updatedMessages);
+        setMessages(prev => [
+          ...prev.filter(m => m.type !== 'loading'),
+          { role: 'assistant', content: ollamaRes.response, timestamp: new Date().toISOString() },
+        ]);
       }
     } catch (e) {
       console.error('Error', e);
+    } finally {
+      setIsWaitingForResponse(false);
     }
   };
 
@@ -264,6 +271,18 @@ export default function ChatScreen() {
           onContentSizeChange={() => (flatListRef.current as any)?.scrollToEnd({ animated: true })}
           onLayout={() => (flatListRef.current as any)?.scrollToEnd({ animated: true })}
         />
+        <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
+        {loadingMessages.length > 0 && isWaitingForResponse && (
+          <View>
+            {loadingMessages.map((msg, idx) => (
+              <View key={`loading-${idx}`} className="mb-2 items-start">
+                <View className="bg-white border border-gray-200 rounded-lg px-4 py-2">
+                  <Text className="text-sm text-gray-600">{msg}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}

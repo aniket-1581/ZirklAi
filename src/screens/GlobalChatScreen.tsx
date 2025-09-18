@@ -1,6 +1,6 @@
 import ChatInput from '@/components/ChatInput';
 import GlobalMessageList from '@/components/GlobalMessageList';
-import LoadingIndicator from '@/components/LoadingIndicator';
+import LoadingMessage from '@/components/LoadingMessage';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
@@ -43,7 +43,7 @@ export default function GlobalChatScreen() {
 
           <View style={{ flex: 1, gap: 16 }}>
             <View className='flex-1 mx-5'>
-              <LoadingIndicator isLoading={isLoading} message='Setting up your global chat...' />
+              <LoadingMessage isLoading={isLoading} message='Setting up your global chat...' />
               <GlobalMessageList
                 messages={messages}
                 isWaitingForResponse={isWaitingForResponse}
@@ -54,8 +54,8 @@ export default function GlobalChatScreen() {
               <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
 
               {/* Transient loading messages while waiting for LLM */}
-              {loadingMessages.length > 0 && isLoading && (
-                <View className="px-5">
+              {loadingMessages.length > 0 && isWaitingForResponse && (
+                <View>
                   {loadingMessages.map((msg, idx) => (
                     <View key={`loading-${idx}`} className="mb-2 items-start">
                       <View className="bg-white border border-gray-200 rounded-lg px-4 py-2">

@@ -1,9 +1,10 @@
+import { formatUtcToIstTime } from '@/utils/date';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { Message, Option } from '../types';
-import { formatUtcToIstTime } from '@/utils/date'; 
+import LoadingIndicator from './LoadingIndicator';
 
 interface MessageListProps {
   messages: Message[];
@@ -190,8 +191,8 @@ export default function GlobalMessageList({
                 );
               })}
             </View>
+            <Text className='text-black text-xs text-right'>{time12}</Text>
           </View>
-          <Text className='text-black text-xs text-right'>{time12}</Text>
         </View>
       );
     } else {

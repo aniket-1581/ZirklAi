@@ -1,18 +1,34 @@
-import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
-interface LoadingIndicatorProps {
-  isLoading: boolean;
-  message?: string;
-}
+const LoadingIndicator = () => {
+  const opacity = useSharedValue(0.3);
 
-export default function LoadingIndicator({ isLoading, message = "Setting up your onboarding..." }: LoadingIndicatorProps) {
-  if (!isLoading) return null;
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withTiming(1, {
+        duration: 1000,
+        easing: Easing.inOut(Easing.ease),
+      }),
+      -1, // infinite repeat
+      true // reverse direction
+    );
+  }, [opacity]);
 
-  return (
-    <View className="flex-1 justify-center items-center bg-white">
-      <ActivityIndicator size="large" color="#8B5CF6" />
-      <Text className="mt-4 text-gray-600">{message}</Text>
-    </View>
-  );
-} 
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+    };
+  });
+
+  return <Animated.View className="w-full h-12 bg-[#F6F4FF] rounded-xl" style={animatedStyle} />;
+};
+
+export default LoadingIndicator;

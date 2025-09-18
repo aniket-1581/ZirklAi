@@ -1,15 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, KeyboardAvoidingView, ImageBackground, Keyboard, FlatList } from 'react-native';
-import { ImageIcons } from '@/utils/ImageIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useOnboarding } from '@/hooks/useOnboarding';
-import MessageList from '@/components/MessageList';
 import ChatInput from '@/components/ChatInput';
-import SuccessPopup from '@/components/SuccessPopup';
 import ContactSelector from '@/components/ContactSelector';
-import LoadingIndicator from '@/components/LoadingIndicator';
+import LoadingIndicator from '@/components/LoadingMessage';
+import MessageList from '@/components/MessageList';
+import SuccessPopup from '@/components/SuccessPopup';
 import TypingIndicator from '@/components/TypingIndicator';
+import { useOnboarding } from '@/hooks/useOnboarding';
 import { Message } from '@/types';
+import { ImageIcons } from '@/utils/ImageIcons';
+import React, { useEffect, useRef, useState } from 'react';
+import { FlatList, ImageBackground, Keyboard, KeyboardAvoidingView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function OnboardingScreen() {
     const flatListRef = useRef<FlatList<Message> | null>(null);
