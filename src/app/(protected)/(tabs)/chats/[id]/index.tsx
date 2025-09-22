@@ -252,13 +252,12 @@ export default function ChatScreen() {
   return (
     <ImageBackground source={ImageIcons.BackgroundImage} className="flex-1">
       {/* Header */}
-      <View className="flex-row items-center justify-start px-5 pt-10 pb-4 border-b border-[#35383E]">
+      <View className="flex-row items-center justify-start pt-20 px-5 pb-4 border-b border-[#35383E]">
         <TouchableOpacity className='mr-4' onPress={() => router.canGoBack() ? router.back() : router.replace('/(protected)/(tabs)/chats')}>
           <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View>
           <Text className='text-black text-[22px] font-bold'>{note?.contact_name}</Text>
-          <Text className='text-[#B0B0B0] text-sm'>{note?.goal}</Text>
         </View>
       </View>
       {/* Chat */}

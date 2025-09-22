@@ -7,13 +7,16 @@ export function formatUtcToIstTime(utcDate: string | Date): string {
   if (!utcDate) {
     return '';
   }
-  const date = new Date(utcDate);
+  const date = new Date(utcDate); // Works with both ISO strings and Date objects
 
-  // Use toLocaleString to format the time in the 'Asia/Kolkata' timezone.
-  return date.toLocaleString('en-US', {
-    timeZone: 'Asia/Kolkata',
-    hour12: true,
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  // IST is UTC+5:30
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(date.getTime() + istOffset);
+
+  const istHoursUTC = istTime.getUTCHours();
+  const istMinutesUTC = istTime.getUTCMinutes();
+
+  const period = istHoursUTC >= 12 ? 'PM' : 'AM';
+  let displayHours = istHoursUTC % 12;
+  return displayHours === 0 ? `12:${istMinutesUTC.toString().padStart(2, '0')} ${period}` : `${displayHours}:${istMinutesUTC.toString().padStart(2, '0')} ${period}`;
 }
