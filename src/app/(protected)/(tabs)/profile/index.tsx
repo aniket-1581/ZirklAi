@@ -1,17 +1,17 @@
+import { useAuth } from '@/context/AuthContext';
+import { ImageIcons } from '@/utils/ImageIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    View,
+    Alert,
+    Image,
+    ImageBackground,
+    ScrollView,
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
-    Alert,
-    ImageBackground,
-    Image,
+    View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useAuth } from '@/context/AuthContext';
-import { ImageIcons } from '@/utils/ImageIcons';
 
 const ageGroups = [
     '15 - 20 years',
@@ -28,7 +28,8 @@ export default function ProfileScreen() {
     const [name, setName] = useState(user?.full_name || '');
     const [ageGroup, setAgeGroup] = useState(user?.age_group || '');
     const [location, setLocation] = useState(user?.location || '');
-    const [profession, setProfession] = useState(user?.work_profession || '');
+    const [profession, setProfession] = useState(user?.profession || '');
+    const [company, setCompany] = useState(user?.company || '');
     const [editing, setEditing] = useState(false);
 
     const handleSave = () => {
@@ -115,6 +116,17 @@ export default function ProfileScreen() {
                             <TextInput
                                 value={profession}
                                 onChangeText={setProfession}
+                                editable={editing}
+                                placeholder="Enter your profession"
+                                placeholderTextColor="#999"
+                                className="bg-gray-100 rounded-xl px-4 py-3 mb-4 text-black"
+                            />
+
+                            {/* Company */}
+                            <Text className="text-base font-semibold text-gray-700 mb-1">Company</Text>
+                            <TextInput
+                                value={company}
+                                onChangeText={setCompany}
                                 editable={editing}
                                 placeholder="Enter your profession"
                                 placeholderTextColor="#999"

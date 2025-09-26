@@ -123,7 +123,7 @@ export function useGlobalChat() {
   const handleOptionSelect = async (option: string | Option) => {
     if (!token || isWaitingForResponse) return;
 
-    const text = typeof option === 'string' ? option : (option as any).title;
+    const text = typeof option === 'string' ? option : (option as any).name ? (option as any).name : (option as any).title;
 
     // We can reuse the logic from handleTextSubmit
     await handleTextSubmit(text);

@@ -160,7 +160,6 @@ export default function ChatScreen() {
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
     const time12 = formatUtcToIstTime(item.timestamp);
-    console.log('Time in IST:', time12);
 
     const isAssistant = item.role === 'assistant';
     const content = item.content || '';

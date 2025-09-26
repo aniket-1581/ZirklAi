@@ -1,12 +1,12 @@
 import { getNotes } from '@/api/notes';
+import NewChatModal from '@/components/MobileNewChatModal';
 import { useAuth } from '@/context/AuthContext';
 import { ImageIcons } from '@/utils/ImageIcons';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, ImageBackground, Text, TouchableOpacity, View } from 'react-native';
-import NewChatModal from '@/components/MobileNewChatModal';
 import { useFocusEffect } from '@react-navigation/native';
+import { router } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, ImageBackground, Text, TouchableOpacity, View } from 'react-native';
 
 const avatarColors = ['bg-[#E1E1E1]', 'bg-[#D6DDB2]', 'bg-[#B7D9F7]', 'bg-[#F7B7D9]', 'bg-[#B7EFC8]'];
 
@@ -66,8 +66,8 @@ export default function ChatsScreen() {
                 <View className={`w-8 h-8 rounded-full ${avatarColors[index]} mr-4`} />
                 <View className='flex-1'>
                   <Text className='text-black text-base font-semibold'>{item.contact_name}</Text>
-                  {item.work_profession && (
-                    <Text className='text-[#B0B0B0] text-sm mt-1'>{item.work_profession}</Text>
+                  {item.profession && (
+                    <Text className='text-[#B0B0B0] text-sm mt-1'>{item.profession}</Text>
                   )}
                 </View>
                 <MaterialIcons name="chat-bubble" size={20} color="#B0B0B0" />

@@ -11,16 +11,17 @@ import React, {
 import Toast from 'react-native-toast-message';
 
 import { login as apiLogin, getUser, verifyOtp } from '@/api/auth';
-import { getOnboardingStatus, OnboardingStatusResponse } from '@/api/onboarding';
-import { registerAndSendFcmToken } from '@/api/notifications';
 import { createCallLogs } from '@/api/call-logs';
+import { registerAndSendFcmToken } from '@/api/notifications';
+import { getOnboardingStatus, OnboardingStatusResponse } from '@/api/onboarding';
 import CallLogService from '@/utils/CallLogService';
 
 interface User {
   id: string;
   full_name: string;
   age_group: string;
-  work_profession: string;
+  profession: string;
+  company?: string;
   location: string;
   goal?: string;
   [key: string]: any;
@@ -125,17 +126,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const callLogService = CallLogService.getInstance();
     
     try {
+      const hasPermission = await callLogService.checkPermission();
+      if (!hasPermission) {
+        console.log('Call log permission not granted. Skipping sync.');
+        return;
+      }
+
       const result = await callLogService.getCallLogs(100);
       if (result.success && result.data) {
         const logsToSave = result.data
-          .filter(log => log.type === 'INCOMING' || log.type === 'OUTGOING' || log.type === 'MISSED') // Only save relevant types
           .map(log => ({
             dateTime: log.dateTime,
             duration: log.duration,
             name: log.name || 'Unknown',
             phoneNumber: log.phoneNumber,
             timestamp: log.timestamp,
-            type: log.type as 'INCOMING' | 'OUTGOING' | 'MISSED',
+            type: log.type,
           }));
   
         if (logsToSave.length > 0) {
@@ -164,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setProfileSetupStatus(null);
     }
-  }, [ready, token, getUserDetails, getProfileSetupStatus]);
+  }, [ready, token, getUserDetails, getProfileSetupStatus, getNotificationToken, syncCallLogsToServer]);
 
   const login = useCallback(async (phoneNumber: string) => {
     setIsLoading(true);

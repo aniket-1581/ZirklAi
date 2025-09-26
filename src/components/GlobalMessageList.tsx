@@ -35,7 +35,7 @@ export default function GlobalMessageList({
     return (
       <Text className="text-black text-base">
         {parts.map((part, index) => {
-          if (part.startsWith('*') && part.endsWith('*')) {
+          if (part.startsWith('**') && part.endsWith('**:')) {
             return (
               <Text key={index} className="font-bold">
                 {part.slice(1, -1)}
@@ -106,18 +106,24 @@ export default function GlobalMessageList({
                   <Text className="text-black text-base pr-5">{renderFormattedText(trimmedMsg)}</Text>
                   <Text className='text-black text-xs mt-2 text-right'>{time12}</Text>
                 </View>
-                <TouchableOpacity
-                  className="absolute right-5 top-3" 
-                  onPress={() => handleCopy(trimmedMsg, copyKey)}
-                >
-                  <MaterialIcons name={isCopied ? "check" : "content-copy"} size={18} color={isCopied ? "green" : "#60646D"} />
-                </TouchableOpacity>
+
+                {/* Only show copy icon if it's messageGroupRegex */}
+                {mainContent.match(messageGroupRegex) && (
+                  <TouchableOpacity
+                    className="absolute right-5 top-3" 
+                    onPress={() => handleCopy(trimmedMsg, copyKey)}
+                  >
+                    <MaterialIcons 
+                      name={isCopied ? "check" : "content-copy"} 
+                      size={18} 
+                      color={isCopied ? "green" : "#60646D"} 
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
           {adviceOrTips.map((tip: string, idx: number) => {
-            const copyKey = `tip-${index}-${idx}`;
-            const isCopied = copiedStates[copyKey];
             const trimmedTip = tip.trim();
             return (
               <View key={`tip-${idx}`} className="w-full flex-row items-start mb-2">
@@ -139,7 +145,7 @@ export default function GlobalMessageList({
       return (
         <View className={`flex-col items-start mb-4`}>
           <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
-            <Text className="text-lg font-semibold mb-3">
+            <Text className="text-base mb-3">
               {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
             </Text>
 
@@ -167,7 +173,7 @@ export default function GlobalMessageList({
           </View>
         </View>
       );
-    } else if (isAssistant && item.options && item.type === 'option') {
+    } else if (isAssistant && item.options && (item.type === 'option' || item.type === 'confirmation')) {
       return (
         <View className={`flex-col items-start mb-4`}>
           <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
@@ -184,8 +190,8 @@ export default function GlobalMessageList({
                     onPress={() => onOptionSelect(opt)}
                     className={`w-[48%] mb-3 rounded-xl p-3 ${cardClasses}`}
                   >
-                    <Text className="font-semibold text-base">{opt.title}</Text>
-                    <Text className="text-xs text-gray-500">{opt.contact_number}</Text>
+                    <Text className="font-semibold text-base">{opt.name}</Text>
+                    <Text className="text-xs text-gray-500">{opt.phoneNumber}</Text>
                   </TouchableOpacity>
                 );
               })}
