@@ -6,6 +6,7 @@
   "build": {
     "develop": {
       "android": {
+        "distribution": "internal",
         "buildType": "apk"
       },
       "env": {

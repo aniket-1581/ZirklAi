@@ -7,7 +7,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { Message, Option } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Keyboard } from 'react-native';
 
 export function useGlobalChat() {
   const { token } = useAuth();
@@ -74,6 +74,7 @@ export function useGlobalChat() {
   }, [token]);
 
   const handleTextSubmit = async (text?: string) => {
+    Keyboard.dismiss
     const input = text || userInput.trim();
     if (!token || !input || isWaitingForResponse) return;
 

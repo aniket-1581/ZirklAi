@@ -1,17 +1,16 @@
 import ChatInput from '@/components/ChatInput';
 import GlobalMessageList from '@/components/GlobalMessageList';
+import KeyboardLayout from '@/components/KeyboardAvoidingLayout';
 import LoadingMessage from '@/components/LoadingMessage';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
 import { ImageIcons } from '@/utils/ImageIcons';
-import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, ImageBackground, Keyboard, KeyboardAvoidingView, Text, View, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useRef } from 'react';
+import { FlatList, ImageBackground, Text, View } from 'react-native';
 
 export default function GlobalChatScreen() {
   const flatListRef = useRef<FlatList<Message> | null>(null);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const {
     messages,
@@ -24,27 +23,12 @@ export default function GlobalChatScreen() {
     handleOptionSelect,
   } = useGlobalChat();
 
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
   return (
     <ImageBackground source={ImageIcons.BackgroundImage} resizeMode="cover" style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
+      <KeyboardLayout>
         <View className="flex items-start border-b border-gray-200 p-5 bg-white/90">
           <Text className="text-black text-2xl font-bold">Zirkl Global Chat</Text>
         </View>
-
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
           <View className='flex-1 mx-5 mt-4'>
             <LoadingMessage isLoading={isLoading} message='Setting up your global chat...' />
             <GlobalMessageList
@@ -70,8 +54,7 @@ export default function GlobalChatScreen() {
             )}
           </View>
           <ChatInput userInput={userInput} setUserInput={setUserInput} onTextSubmit={() => handleTextSubmit()} isWaitingForResponse={isWaitingForResponse} />
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+      </KeyboardLayout>
     </ImageBackground>
   );
 }
