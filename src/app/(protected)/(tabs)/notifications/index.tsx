@@ -53,7 +53,7 @@ export default function NotificationsScreen() {
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
           renderItem={({ item }) => (
             <View className='bg-white/90 rounded-xl p-4 mb-3 border border-[#e5e7eb]'>
-              <Text className='text-black font-semibold text-base'>{item.title}</Text>
+              {/*<Text className='text-black font-semibold text-base'>{item.title}</Text>*/}
               <Text className='text-[#4B5563] mt-1'>{item.message}</Text>
             </View>
           )}
