@@ -3,7 +3,7 @@ import NewChatModal from '@/components/MobileNewChatModal';
 import { useAuth } from '@/context/AuthContext';
 import { ImageIcons } from '@/utils/ImageIcons';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ImageBackground, Text, TouchableOpacity, View } from 'react-native';
@@ -16,7 +16,7 @@ export default function ChatsScreen() {
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     setLoading(true);
     try {
       const notes = await getNotes(token!) as any[];
@@ -27,11 +27,12 @@ export default function ChatsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
   useFocusEffect(
     useCallback(() => {
       fetchNotes();
-    }, [])
+    }, [fetchNotes])
   );
 
   const handleChatPress = (contact: any) => {

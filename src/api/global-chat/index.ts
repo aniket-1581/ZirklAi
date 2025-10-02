@@ -45,14 +45,14 @@ export async function getLoadingMessage(token: string) {
 } 
 
 export async function globalChatWithLlm(message: string, token: string) {
-    const res = await fetch(`${BASE_URL}/global-chat/llm`, {
+    const res = await fetch(`${BASE_URL}/chat/draft-message`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, note_id: "", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
     });
     if (!res.ok) throw new Error('Failed to chat with Ollama');
     return res.json();

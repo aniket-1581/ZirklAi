@@ -14,19 +14,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
+import { updateProfile } from "@/api/profile";
 
 const ageGroups = [
-  "15 - 20 years",
-  "21 - 30 years",
-  "31 - 35 years",
-  "35 - 40 years",
-  "41 - 45 years",
-  "46 - 50 years",
-  "50+ years",
+  "18 - 25 years",
+  "26 - 35 years",
+  "36 - 50 years",
+  "51+ years",
 ];
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { token, user, logout } = useAuth();
   const { events, getEvents } = useCalendar();
 
   const [name, setName] = useState(user?.full_name || "");
@@ -35,9 +34,52 @@ export default function ProfileScreen() {
   const [profession, setProfession] = useState(user?.profession || "");
   const [company, setCompany] = useState(user?.company || "");
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setEditing(false);
+  const handleSave = async () => {
+    if (!token) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Authentication token not found.',
+        visibilityTime: 3000,
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const profileData = {
+        full_name: name,
+        age_group: ageGroup,
+        location,
+        profession,
+        company,
+      };
+
+      await updateProfile(token, profileData);
+
+      setEditing(false);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Profile Updated',
+        text2: 'Your profile has been updated successfully.',
+        visibilityTime: 3000,
+      });
+
+      console.log('Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: 'Failed to update profile. Please try again.',
+        visibilityTime: 3000,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () =>
@@ -173,9 +215,10 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                     className="bg-violet-600 py-3 rounded-xl items-center mt-2"
                     onPress={handleSave}
+                    disabled={saving}
                     >
-                    <Text className="text-white font-semibold text-base">
-                        Save Changes
+                    <Text className={`font-semibold text-base ${saving ? 'text-gray-400' : 'text-white'}`}>
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </Text>
                     </TouchableOpacity>
                 )}

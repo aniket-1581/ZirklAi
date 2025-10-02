@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
-import { Platform } from "react-native";
+import { useEffect, useState, useCallback } from "react";
 import * as Calendar from "expo-calendar";
-import * as AuthSession from "expo-auth-session";
 import { useAuth } from "@/context/AuthContext";
 
 
@@ -12,30 +10,12 @@ export function useCalendar() {
   const [defaultCalendarId, setDefaultCalendarId] = useState<string | null>(null);
   const [events, setEvents] = useState<Calendar.Event[]>([]);
 
-  useEffect(() => {
-    (async () => {
-      const granted = await requestCalendarPermissions();
-      if (!granted) return;
-
-      const calendarList = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-      setCalendars(calendarList);
-
-      const writable = calendarList.filter((c) => c.allowsModifications);
-      setWritableCalendars(writable);
-
-      if (writable.length > 0) {
-        setDefaultCalendarId(writable[0].id);
-        await getEvents();
-      }
-    })();
-  }, [user]);
-
   const requestCalendarPermissions = async (): Promise<boolean> => {
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     return status === "granted";
   };
 
-  const getEvents = async (): Promise<void> => {
+  const getEvents = useCallback(async (): Promise<void> => {
     if (!defaultCalendarId) return;
 
     const now = new Date();
@@ -47,11 +27,32 @@ export function useCalendar() {
 
     try {
       const fetched = await Calendar.getEventsAsync([defaultCalendarId], start, end);
-      setEvents(fetched);
+
+      // Filter events to only include those with title "[Zirkl Ai]"
+      const zirklAiEvents = fetched.filter(event => event.title === "[Zirkl Ai]");
+
+      setEvents(zirklAiEvents);
     } catch (err) {
       console.error("Error fetching events", err);
     }
-  };
+  }, [defaultCalendarId]);
+
+  useEffect(() => {
+    (async () => {
+      const granted = await requestCalendarPermissions();
+      if (!granted) return;
+
+      const calendarList = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      setCalendars(calendarList);
+
+      const writable = calendarList.filter((c) => c.allowsModifications);
+      setWritableCalendars(writable);
+      if (writable.length > 0) {
+        setDefaultCalendarId(writable[0].id);
+        await getEvents();
+      }
+    })();
+  }, [user]);
 
   const createDeviceEvent = async (event: {
     title: string;

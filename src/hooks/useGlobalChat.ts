@@ -3,6 +3,7 @@ import {
   getLoadingMessage,
   getWelcomeMessage,
   globalChatWithLlm,
+  getReturningMessage
 } from '@/api/global-chat';
 import { useAuth } from '@/context/AuthContext';
 import { Message, Option } from '@/types';
@@ -39,13 +40,13 @@ export function useGlobalChat() {
     );
   };
 
-  const loadWelcomeMessage = async () => {
+  const loadWelcomeMessage = useCallback(async () => {
     try {
       await getWelcomeMessage(token as string);
     } catch (err) {
       console.error('Welcome message failed:', err);
     }
-  };
+  }, [token]);
 
   const loadHistory = useCallback(async () => {
     if (!token) return;
@@ -55,7 +56,29 @@ export function useGlobalChat() {
       console.log("Fetched history:", history);
       const normalized = normalizeMessages(history);
       if (normalized.length > 0) {
-        setMessages([...normalized]);
+        const lastMessage = normalized[normalized.length - 1];
+
+        const shouldAddReturningMessage =
+          lastMessage?.options?.length === 0 &&
+          lastMessage?.type !== 'flow' &&
+          lastMessage?.timestamp < new Date(Date.now() - 60 * 60 * 1000);
+
+        if (shouldAddReturningMessage) {
+          try {
+            const returning = await getReturningMessage(token);
+            if (returning?.message) {
+              setMessages([
+                { role: 'assistant', content: returning.message, timestamp: new Date() },
+                ...normalized,
+              ]);
+              return;
+            }
+          } catch {
+            console.warn('Returning message fetch failed');
+          }
+        } else {
+          setMessages(normalized);
+        }
       } else {
         await loadWelcomeMessage();
         const history = await getGlobalChatHistory(token);
@@ -71,10 +94,10 @@ export function useGlobalChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, loadWelcomeMessage]);
 
   const handleTextSubmit = async (text?: string) => {
-    Keyboard.dismiss
+    Keyboard.dismiss();
     const input = text || userInput.trim();
     if (!token || !input || isWaitingForResponse) return;
 
@@ -145,5 +168,6 @@ export function useGlobalChat() {
     setUserInput,
     handleTextSubmit,
     handleOptionSelect,
+    loadHistory,
   };
 }

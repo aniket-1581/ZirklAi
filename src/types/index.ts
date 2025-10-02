@@ -11,6 +11,8 @@ export interface Message {
   timestamp: Date;
   next_step?: string;
   step?: string;
+  type?: 'text' | 'flow';
+  start_time?: string;
 }
 
 export interface Contact {

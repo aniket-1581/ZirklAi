@@ -3,7 +3,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { Message, Option } from '../types';
+import { useCalendar } from '../hooks/useCalendar';
 
 interface MessageListProps {
   messages: Message[];
@@ -20,7 +22,9 @@ export default function GlobalMessageList({
   flatListRef,
   currentStep
 }: MessageListProps) {
+  const { createDeviceEvent, events } = useCalendar();
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
+  const [createdEventIds, setCreatedEventIds] = useState<Set<string>>(new Set());
 
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
@@ -28,6 +32,73 @@ export default function GlobalMessageList({
     setTimeout(() => {
       setCopiedStates((prev) => ({ ...prev, [key]: false }));
     }, 3000);
+  };
+
+  const handleCreateCalendarEvent = async (message: Message) => {
+    if (!message.start_time) return;
+
+    try {
+      // Check if event already exists for this message
+      const messageTimestamp = new Date(message.start_time).toISOString();
+      const existingEvent = events.find(event =>
+        event.notes === message.content &&
+        event.startDate &&
+        new Date(event.startDate).toISOString() === messageTimestamp
+      );
+
+      if (existingEvent) {
+        Toast.show({
+          type: 'info',
+          text1: 'Event Already Created',
+          text2: 'This reminder has already been added to your calendar.',
+          visibilityTime: 3000,
+        });
+        return;
+      }
+
+      // Parse the start_time string into a Date object
+      const startDate = new Date(message.start_time);
+
+      // Validate that the date was parsed correctly
+      if (isNaN(startDate.getTime())) {
+        throw new Error('Invalid start_time format');
+      }
+
+      // Calculate end date (1 hour after start time)
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+      const title = `[Zirkl Ai]`;
+
+      await createDeviceEvent({
+        title,
+        startDate,
+        endDate,
+        location: 'remote',
+        notes: message.content
+      });
+
+      // Track that this message has an event created
+      if (message.start_time) {
+        setCreatedEventIds(prev => new Set([...prev, message.start_time!]));
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Event Created Successfully',
+        text2: 'Reminder has been added to your calendar.',
+        visibilityTime: 3000,
+      });
+
+      console.log('Calendar event created successfully');
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error Creating Event',
+        text2: 'Failed to create calendar event. Please try again.',
+        visibilityTime: 3000,
+      });
+    }
   };
 
   const renderFormattedText = (text: string) => {
@@ -90,6 +161,20 @@ export default function GlobalMessageList({
           {introText && (
             <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
               <Text className="text-black text-base">{introText}</Text>
+
+              {/* Calendar button for messages with start_time */}
+              {item.start_time && !createdEventIds.has(item.start_time) && (
+                <TouchableOpacity
+                  className="absolute right-2 top-2"
+                  onPress={() => handleCreateCalendarEvent(item)}
+                >
+                  <MaterialIcons
+                    name="event"
+                    size={18}
+                    color="#60646D"
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           )}
           {suggestionMessages.map((msg: string, idx: number) => {
@@ -107,8 +192,8 @@ export default function GlobalMessageList({
                   <Text className='text-black text-xs mt-2 text-right'>{time12}</Text>
                 </View>
 
-                {/* Only show copy icon if it's messageGroupRegex */}
-                {mainContent.match(messageGroupRegex) && (
+                {/* Only show copy icon for Message 1, 2, 3 parts */}
+                {(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && (
                   <TouchableOpacity
                     className="absolute right-5 top-3" 
                     onPress={() => handleCopy(trimmedMsg, copyKey)}
@@ -117,6 +202,20 @@ export default function GlobalMessageList({
                       name={isCopied ? "check" : "content-copy"} 
                       size={18} 
                       color={isCopied ? "green" : "#60646D"} 
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Calendar button for messages with start_time */}
+                {item.start_time && !(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && !createdEventIds.has(item.start_time) && (
+                  <TouchableOpacity
+                    className="fixed right-5 top-3"
+                    onPress={() => handleCreateCalendarEvent(item)}
+                  >
+                    <MaterialIcons
+                      name="event"
+                      size={18}
+                      color="#60646D"
                     />
                   </TouchableOpacity>
                 )}
@@ -206,6 +305,21 @@ export default function GlobalMessageList({
         <View className={`flex-row ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start mb-4`}>
           <View className={`max-w-[85%] border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
             <Text className={`text-black text-base`}>{item.content}</Text>
+
+            {/* Calendar button for messages with start_time */}
+            {isAssistant && item.start_time && !createdEventIds.has(item.start_time) && (
+              <TouchableOpacity
+                className="absolute right-2 top-2"
+                onPress={() => handleCreateCalendarEvent(item)}
+              >
+                <MaterialIcons
+                  name="event"
+                  size={18}
+                  color="#60646D"
+                />
+              </TouchableOpacity>
+            )}
+
             <Text className='text-black text-xs text-right'>{time12}</Text>
           </View>
           {item.options && (
@@ -240,7 +354,7 @@ export default function GlobalMessageList({
         }
       }, 100);
     }
-  }, [messages]);
+  }, [messages, flatListRef]);
 
   return (
     <FlatList

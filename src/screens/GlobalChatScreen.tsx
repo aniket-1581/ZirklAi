@@ -6,8 +6,9 @@ import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
 import { ImageIcons } from '@/utils/ImageIcons';
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { FlatList, ImageBackground, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 export default function GlobalChatScreen() {
   const flatListRef = useRef<FlatList<Message> | null>(null);
@@ -21,7 +22,16 @@ export default function GlobalChatScreen() {
     handleTextSubmit,
     loadingMessages,
     handleOptionSelect,
+    loadHistory,
   } = useGlobalChat();
+
+  // Refetch data when screen comes into focus (tab is selected)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Global chat screen focused - refetching data');
+      loadHistory(); // Refetch chat history when tab is selected
+    }, [loadHistory])
+  );
 
   return (
     <ImageBackground source={ImageIcons.BackgroundImage} resizeMode="cover" style={{ flex: 1 }}>

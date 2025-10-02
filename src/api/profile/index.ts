@@ -11,20 +11,6 @@ export async function getProfileStatus(token: string) {
   return res.json();
 }
 
-export async function setSyncContacts(token: string, contacts: any) {
-  const res = await fetch(`${BASE_URL}/profile/step/1`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    method: "PATCH", // Use PATCH for partial updates
-    body: JSON.stringify(contacts),
-  });
-  if (!res.ok) throw new Error("Failed to update sync contacts");
-  return res.json();
-}
-
 export async function setPhoneContacts(token: string, data: any) {
   const res = await fetch(`${BASE_URL}/profile/sync-contacts`, {
     headers: {
@@ -62,5 +48,19 @@ export async function createNote(token: string, notes: any[]) {
     body: JSON.stringify(notes),
   });
   if (!res.ok) throw new Error("Failed to create note");
+  return res.json();
+}
+
+export async function updateProfile(token: string, data: any) {
+  const res = await fetch(`${BASE_URL}/profile`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update profile");
   return res.json();
 }
