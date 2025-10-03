@@ -45,7 +45,7 @@ export async function getLoadingMessage(token: string) {
 } 
 
 export async function globalChatWithLlm(message: string, token: string) {
-    const res = await fetch(`${BASE_URL}/chat/draft-message`, {
+    const res = await fetch(`${BASE_URL}/global-chat/llm`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

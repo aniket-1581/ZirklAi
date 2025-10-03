@@ -102,20 +102,49 @@ export default function GlobalMessageList({
   };
 
   const renderFormattedText = (text: string) => {
-    const parts = text.split(/(\*.*?\*)/g);
+    // Split by ### headers first
+    const headerRegex = /(### .*?)(?=\n|$)/g;
+    const parts = text.split(headerRegex);
+
     return (
-      <Text className="text-black text-base">
+      <View className="flex-col">
         {parts.map((part, index) => {
-          if (part.startsWith('**') && part.endsWith('**:')) {
+          // Handle ### headers
+          if (part.startsWith('### ')) {
             return (
-              <Text key={index} className="font-bold">
-                {part.slice(1, -1)}
+              <Text key={index} className="text-black text-lg font-bold mb-2 mt-1 leading-6">
+                {part.slice(4).trim()}
               </Text>
             );
           }
-          return part;
+
+          // Handle **bold text** within the remaining text
+          if (part.includes('**')) {
+            const boldParts = part.split(/(\*\*.*?\*\*)/g);
+            return (
+              <Text key={index} className="text-black text-base leading-5">
+                {boldParts.map((boldPart, boldIndex) => {
+                  if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+                    return (
+                      <Text key={boldIndex} className="font-bold text-black">
+                        {boldPart.slice(2, -2)}
+                      </Text>
+                    );
+                  }
+                  return boldPart;
+                })}
+              </Text>
+            );
+          }
+
+          // Regular text
+          return (
+            <Text key={index} className="text-black text-base leading-5 mb-1">
+              {part}
+            </Text>
+          );
         })}
-      </Text>
+      </View>
     );
   };
 
@@ -159,8 +188,10 @@ export default function GlobalMessageList({
         return (
           <View className={`flex-col items-start mb-4`}>
           {introText && (
-            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
-              <Text className="text-black text-base">{introText}</Text>
+            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-2xl px-6 py-4 mb-4 shadow-sm">
+              <View className="mb-2">
+                {renderFormattedText(introText)}
+              </View>
 
               {/* Calendar button for messages with start_time */}
               {item.start_time && !createdEventIds.has(item.start_time) && (
@@ -168,11 +199,7 @@ export default function GlobalMessageList({
                   className="absolute right-2 top-2"
                   onPress={() => handleCreateCalendarEvent(item)}
                 >
-                  <MaterialIcons
-                    name="event"
-                    size={18}
-                    color="#60646D"
-                  />
+                  <Text className="text-gray-500 text-xs">📅</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -185,23 +212,25 @@ export default function GlobalMessageList({
             return (
               <View
                 key={idx}
-                className="max-w-[85%] flex-row items-start mb-3 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
+                className="max-w-[85%] flex-row items-start mb-4 border bg-[#F6F4FF] border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm"
               >
                 <View style={{ flex: 1 }}>
-                  <Text className="text-black text-base pr-5">{renderFormattedText(trimmedMsg)}</Text>
-                  <Text className='text-black text-xs mt-2 text-right'>{time12}</Text>
+                  <View className="mb-2">
+                    {renderFormattedText(trimmedMsg)}
+                  </View>
+                  <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text>
                 </View>
 
                 {/* Only show copy icon for Message 1, 2, 3 parts */}
                 {(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && (
                   <TouchableOpacity
-                    className="absolute right-5 top-3" 
+                    className="absolute right-2 top-2"
                     onPress={() => handleCopy(trimmedMsg, copyKey)}
                   >
-                    <MaterialIcons 
-                      name={isCopied ? "check" : "content-copy"} 
-                      size={18} 
-                      color={isCopied ? "green" : "#60646D"} 
+                    <MaterialIcons
+                      name={isCopied ? "check" : "content-copy"}
+                      size={18}
+                      color={isCopied ? "#10B981" : "#9CA3AF"}
                     />
                   </TouchableOpacity>
                 )}
@@ -209,14 +238,10 @@ export default function GlobalMessageList({
                 {/* Calendar button for messages with start_time */}
                 {item.start_time && !(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && !createdEventIds.has(item.start_time) && (
                   <TouchableOpacity
-                    className="fixed right-5 top-3"
+                    className="absolute right-2 top-2"
                     onPress={() => handleCreateCalendarEvent(item)}
                   >
-                    <MaterialIcons
-                      name="event"
-                      size={18}
-                      color="#60646D"
-                    />
+                    <Text className="text-gray-500 text-lg">📅</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -225,9 +250,9 @@ export default function GlobalMessageList({
           {adviceOrTips.map((tip: string, idx: number) => {
             const trimmedTip = tip.trim();
             return (
-              <View key={`tip-${idx}`} className="w-full flex-row items-start mb-2">
-                <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-xl px-5 py-3">
-                  <View style={{ flex: 1 }}>
+              <View key={`tip-${idx}`} className="w-full flex-row items-start mb-4">
+                <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm">
+                  <View style={{ flex: 1 }} className="mb-2">
                     {renderFormattedText(trimmedTip)}
                   </View>
                 </View>
@@ -243,7 +268,7 @@ export default function GlobalMessageList({
     if (isAssistant && item.options && item.type === 'flow') {
       return (
         <View className={`flex-col items-start mb-4`}>
-          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
+          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 shadow-sm">
             <Text className="text-base mb-3">
               {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
             </Text>
@@ -303,8 +328,10 @@ export default function GlobalMessageList({
       // Normal single message (user or assistant)
       return (
         <View className={`flex-row ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start mb-4`}>
-          <View className={`max-w-[85%] border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-xl px-5 py-3`}>
-            <Text className={`text-black text-base`}>{item.content}</Text>
+          <View className={`max-w-[85%] border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-2xl px-6 py-4 shadow-sm`}>
+            <View className="mb-2">
+              <Text className={`text-black text-base leading-5`}>{item.content}</Text>
+            </View>
 
             {/* Calendar button for messages with start_time */}
             {isAssistant && item.start_time && !createdEventIds.has(item.start_time) && (
@@ -312,15 +339,11 @@ export default function GlobalMessageList({
                 className="absolute right-2 top-2"
                 onPress={() => handleCreateCalendarEvent(item)}
               >
-                <MaterialIcons
-                  name="event"
-                  size={18}
-                  color="#60646D"
-                />
+                <Text className="text-gray-500 text-xs">📅</Text>
               </TouchableOpacity>
             )}
 
-            <Text className='text-black text-xs text-right'>{time12}</Text>
+            <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text>
           </View>
           {item.options && (
             <View className="flex mt-3 gap-2">
