@@ -56,4 +56,34 @@ export async function getNotifications(token: string, limit: number = 50, skip: 
   return res.json();
 }
 
+export async function deleteNotification(token: string, notificationId: string) {
+  const url = new URL(`${BASE_URL}/api/v1/notifications/${notificationId}`);
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+  });
+  if (!res.ok) throw new Error('Failed to delete notification');
+  return res.json();
+}
+
+export async function nudgeAction(token: string, notificationId: string) {
+  const url = new URL(`${BASE_URL}/api/v1/profile/nudge-action`);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ notification_id: notificationId }),
+  });
+  if (!res.ok) throw new Error('Failed to fetch notifications');
+  return res.json();
+}
+  
+
 

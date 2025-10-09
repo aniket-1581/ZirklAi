@@ -64,3 +64,16 @@ export async function updateProfile(token: string, data: any) {
   if (!res.ok) throw new Error("Failed to update profile");
   return res.json();
 }
+
+
+export async function getNudges(token: string) {
+  const res = await fetch(`${BASE_URL}/profile/nudge-data`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+  });
+  if (!res.ok) throw new Error("Failed to fetch nudges");
+  return res.json();
+}
