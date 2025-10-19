@@ -14,7 +14,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSContactsUsageDescription": "This app uses your contacts to help you connect and interact with people you know.",
-        "NSCalendarsUsageDescription": "This app needs access to your calendar to manage events."
+        "NSCalendarsUsageDescription": "This app needs access to your calendar to manage events.",
+        "NSCallLogUsageDescription": "This app needs access to your call log to manage events."
       }
     },
     "android": {

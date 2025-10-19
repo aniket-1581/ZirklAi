@@ -1,29 +1,25 @@
 import { getNotifications, NotificationItem, nudgeAction, deleteNotification } from "@/api/notifications";
 import { useAuth } from "@/context/AuthContext";
 import { formatUtcToIstTime } from "@/utils/date";
-import { ImageIcons } from "@/utils/ImageIcons";
-import { notificationStorage, ArchivedNotification } from "@/utils/notificationStorage";
+import { notificationStorage, SnoozedNotification } from "@/utils/notificationStorage";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   SectionList,
-  Image,
-  ImageBackground,
   RefreshControl,
   Text,
   View,
   TouchableOpacity,
-  PanResponder,
-  Animated
 } from "react-native";
 import Toast from "react-native-toast-message";
+
 export default function NotificationsScreen() {
   const { token } = useAuth();
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [archivedItems, setArchivedItems] = useState<ArchivedNotification[]>([]);
+  const [snoozedItems, setSnoozedItems] = useState<SnoozedNotification[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const [showSnoozed, setShowSnoozed] = useState(false);
   const [allNotifications, setAllNotifications] = useState<NotificationItem[]>([]);
   const router = useRouter();
 
@@ -49,18 +45,18 @@ export default function NotificationsScreen() {
     }
   }, [token]);
 
-  // Filter notifications based on archived items when either changes
+  // Filter notifications based on snoozed items when either changes
   useEffect(() => {
     if (allNotifications.length > 0) {
-      const archivedIds = new Set(archivedItems.map(item => item._id));
-      const activeNotifications = allNotifications.filter((notification: NotificationItem) => !archivedIds.has(notification._id));
+      const snoozedIds = new Set(snoozedItems.map(item => item._id));
+      const activeNotifications = allNotifications.filter((notification: NotificationItem) => !snoozedIds.has(notification._id));
       setItems(activeNotifications);
     }
-  }, [allNotifications, archivedItems]);
+  }, [allNotifications, snoozedItems]);
 
-  const loadArchived = useCallback(async () => {
-    const archived = await notificationStorage.getArchivedNotifications();
-    setArchivedItems(archived);
+  const loadSnoozed = useCallback(async () => {
+    const snoozed = await notificationStorage.getSnoozedNotifications();
+    setSnoozedItems(snoozed);
   }, []);
 
   // Refetch data when screen comes into focus (tab is selected)
@@ -68,8 +64,8 @@ export default function NotificationsScreen() {
     useCallback(() => {
       console.log("Notifications screen focused - refetching data");
       load(); // Refetch notifications when tab is selected
-      loadArchived(); // Load archived notifications
-    }, [load, loadArchived])
+      loadSnoozed(); // Load snoozed notifications
+    }, [load, loadSnoozed])
   );
 
   const handleNudgeAction = async (notificationId: string) => {
@@ -85,31 +81,31 @@ export default function NotificationsScreen() {
     }
   }
 
-  const archiveNotification = async (notification: NotificationItem) => {
+  const snoozeNotification = async (notification: NotificationItem, snoozeHours: number = 1) => {
     try {
-      await notificationStorage.archiveNotification(notification);
-      await loadArchived(); // Refresh archived list
+      await notificationStorage.snoozeNotification(notification, snoozeHours);
+      await loadSnoozed(); // Refresh snoozed list
       load(); // Refresh active list
     } catch (error) {
-      console.error('Failed to archive notification:', error);
+      console.error('Failed to snooze notification:', error);
     }
   }
 
-  const unarchiveNotification = async (notificationId: string) => {
+  const unsnoozeNotification = async (notificationId: string) => {
     try {
-      await notificationStorage.unarchiveNotification(notificationId);
-      await loadArchived(); // Refresh archived list
+      await notificationStorage.unsnoozeNotification(notificationId);
+      await loadSnoozed(); // Refresh snoozed list
       load(); // Refresh active list
     } catch (error) {
-      console.error('Failed to unarchive notification:', error);
+      console.error('Failed to unsnooze notification:', error);
     }
   }
 
-  const currentItems = showArchived ? archivedItems : items;
+  const currentItems = showSnoozed ? snoozedItems : items;
 
   // Group notifications by date
-  const groupNotificationsByDate = (notifications: (NotificationItem | ArchivedNotification)[]) => {
-    const groups: { [key: string]: (NotificationItem | ArchivedNotification)[] } = {};
+  const groupNotificationsByDate = (notifications: (NotificationItem | SnoozedNotification)[]) => {
+    const groups: { [key: string]: (NotificationItem | SnoozedNotification)[] } = {};
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -150,71 +146,42 @@ export default function NotificationsScreen() {
   const sections = groupNotificationsByDate(currentItems);
 
   const renderSectionHeader = ({ section }: any) => (
-    <View className="px-5 py-2 bg-gray-50">
-      <Text className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+    <View className="px-5 py-2 mb-4 mt-3 bg-[#3A327B]">
+      <Text className="text-sm font-semibold text-white uppercase tracking-wide">
         {section.title}
       </Text>
     </View>
   );
 
   const renderEmpty = (
-    <View className="flex-1 items-center justify-center py-16">
+    <View className="flex-1 items-center justify-center">
       <MaterialIcons
-        name={showArchived ? "archive" : "notifications-none"}
+        name={showSnoozed ? "schedule" : "notifications-none"}
         size={64}
-        color="#6E9EFF"
+        color="white"
         style={{ marginBottom: 16 }}
       />
-      <Text className="text-black text-lg font-semibold mb-1">
-        {showArchived ? "Archived Notifications" : "Notifications"}
+      <Text className="text-white text-lg font-semibold mb-1">
+        {showSnoozed ? "Snoozed Notifications" : "Notifications"}
       </Text>
       <Text className="text-[#999] text-base">
-        {showArchived ? "No archived notifications yet." : "No notifications yet."}
+        {showSnoozed ? "No snoozed notifications yet." : "No notifications yet."}
       </Text>
     </View>
   );
 
-  const SwipeableNotificationItem = ({ item }: { item: NotificationItem | ArchivedNotification }) => {
-    const pan = useRef(new Animated.ValueXY()).current;
+  const NotificationItem = ({ item }: { item: NotificationItem | SnoozedNotification }) => {
     const [showMenu, setShowMenu] = useState(false);
 
-    const panResponder = useRef(
-      PanResponder.create({
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderMove: (e, gestureState) => {
-          if (Math.abs(gestureState.dx) > 20) {
-            pan.setValue({ x: gestureState.dx, y: 0 });
-          }
-        },
-        onPanResponderRelease: (e, gestureState) => {
-          if (gestureState.dx > 100) {
-            // Swipe right - archive
-            if (!showArchived && 'archived_at' in item === false) {
-              archiveNotification(item as NotificationItem);
-            }
-          } else if (gestureState.dx < -100) {
-            // Swipe left - archive
-            if (!showArchived && 'archived_at' in item === false) {
-              archiveNotification(item as NotificationItem);
-            }
-          }
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-          }).start();
-        },
-      })
-    ).current;
+    const isSnoozed = 'snoozed_at' in item;
 
-    const isArchived = 'archived_at' in item;
-
-    const handleMenuAction = async (action: 'archive' | 'delete') => {
+    const handleMenuAction = async (action: 'snooze' | 'delete') => {
       setShowMenu(false);
-      if (action === 'archive' && !isArchived) {
-        await archiveNotification(item as NotificationItem);
+      if (action === 'snooze' && !isSnoozed) {
+        await snoozeNotification(item as NotificationItem, 1);
         Toast.show({
           type: 'success',
-          text1: 'Notification archived successfully',
+          text1: 'Notification snoozed for 1 hour',
         })
       } else if (action === 'delete') {
         await deleteNotificationFromAPI(item._id);
@@ -232,22 +199,16 @@ export default function NotificationsScreen() {
         })
         // Refresh the lists
         load();
-        if (showArchived) loadArchived();
+        if (showSnoozed) loadSnoozed();
       } catch (error) {
         console.error('Failed to delete notification:', error);
       }
     };
 
     return (
-      <View style={{ marginVertical: 6, position: 'relative', marginHorizontal: 20 }}>
-        <Animated.View
-          style={{
-            transform: [{ translateX: pan.x }],
-          }}
-          {...panResponder.panHandlers}
-        >
-          <TouchableOpacity onPress={() => !isArchived && handleNudgeAction(item._id)}>
-            <View className="bg-white/95 rounded-2xl px-5 py-3 border border-gray-200 shadow-sm"
+      <View className="flex-1 px-5 mb-4">
+          <TouchableOpacity onPress={() => !isSnoozed && handleNudgeAction(item._id)}>
+            <View className="bg-black/15 rounded-2xl px-5 py-3 border border-gray-200 shadow-sm"
                   style={{
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 2 },
@@ -257,18 +218,18 @@ export default function NotificationsScreen() {
                   }}>
               <View className="flex-row justify-between items-start">
                 <View className="flex-1 pr-4">
-                  <Text className="text-[#374151] text-base leading-6 mb-2">{item.message}</Text>
+                  <Text className="text-white text-lg font-semibold mb-2">{item.title}</Text>
                   <View className="flex-row justify-between items-center">
-                    <Text className="text-[#6B7280] text-sm">
+                    <Text className="text-white text-sm">
                       {formatUtcToIstTime(item.created_at || "")}
                     </Text>
                   </View>
-                  {isArchived && (
+                  {isSnoozed && (
                     <TouchableOpacity
-                      className="mt-3 self-start bg-blue-500 px-4 py-2 rounded-lg"
-                      onPress={() => unarchiveNotification(item._id)}
+                      className="mt-3 self-start bg-[#C6BFFF] px-4 py-2 rounded-lg"
+                      onPress={() => unsnoozeNotification(item._id)}
                     >
-                      <Text className="text-white text-sm font-semibold">Unarchive</Text>
+                      <Text className="text-white text-sm font-semibold">Unsnooze</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -276,7 +237,7 @@ export default function NotificationsScreen() {
                 {/* 3-dot menu button */}
                 <TouchableOpacity
                   onPress={() => setShowMenu(!showMenu)}
-                  className="p-2 bg-gray-50 rounded-full"
+                  className="p-2 bg-white/15 rounded-full"
                   style={{
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },
@@ -290,7 +251,6 @@ export default function NotificationsScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        </Animated.View>
 
         {/* Dropdown menu */}
         {showMenu && (
@@ -305,13 +265,13 @@ export default function NotificationsScreen() {
               elevation: 8,
             }}
           >
-            {!isArchived && (
+            {!isSnoozed && (
               <TouchableOpacity
                 className="px-4 py-3 border-b border-gray-100 flex-row items-center"
-                onPress={() => handleMenuAction('archive')}
+                onPress={() => handleMenuAction('snooze')}
               >
-                <MaterialIcons name="archive" size={16} color="#6B7280" style={{ marginRight: 8 }} />
-                <Text className="text-gray-700 text-sm font-medium">Archive</Text>
+                <MaterialIcons name="schedule" size={16} color="#6B7280" style={{ marginRight: 8 }} />
+                <Text className="text-gray-700 text-sm font-medium">Snooze</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -327,29 +287,27 @@ export default function NotificationsScreen() {
     );
   };
 
-  const renderNotificationItem = ({ item }: { item: NotificationItem | ArchivedNotification }) => (
-    <SwipeableNotificationItem item={item} />
+  const renderNotificationItem = ({ item }: { item: NotificationItem | SnoozedNotification }) => (
+    <NotificationItem item={item} />
   );
 
   return (
-    <View className="flex-1">
-      <ImageBackground
-        source={ImageIcons.BackgroundImage}
-        className="flex-1 bg-white"
-      >
+    <View className="flex-1 bg-[#3A327B]">
         {/* Header */}
-        <Image source={ImageIcons.Logo} className="w-32 h-32 mx-4" />
-        <View className="px-5 pb-2 flex-row justify-between items-center">
-          <Text className="text-xl font-bold text-black">
-            {showArchived ? "Archived Notifications" : "Notifications"}
-          </Text>
+        <View className='flex-row items-center justify-center px-5 mt-16'>
+          <Text className='text-2xl font-medium text-white'>{showSnoozed ? "Snoozed Notifications" : "Notifications"}</Text>
+        </View>
+        <View className="absolute top-6 right-7">
           <TouchableOpacity
-            onPress={() => setShowArchived(!showArchived)}
-            className="bg-blue-500 px-3 py-2 rounded-lg"
+            onPress={() => setShowSnoozed(!showSnoozed)}
           >
-            <Text className="text-white text-sm font-semibold">
-              {showArchived ? "Show Active" : "Show Archived"}
-            </Text>
+            <View className="bg-white/15 rounded-full p-2">
+              {showSnoozed ? (
+                <MaterialIcons name="notifications" size={24} color="white" />
+              ) : (
+                <MaterialIcons name="snooze" size={24} color="white" />
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -358,17 +316,10 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
           ListEmptyComponent={!loading ? renderEmpty : null}
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={() => {
-              load();
-              if (showArchived) loadArchived();
-            }} />
-          }
           renderItem={renderNotificationItem}
           renderSectionHeader={renderSectionHeader}
           stickySectionHeadersEnabled={false}
         />
-      </ImageBackground>
     </View>
   );
 }

@@ -2,10 +2,12 @@ import { formatUtcToIstTime } from '@/utils/date';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Text, TouchableOpacity, View, Keyboard, Image, ScrollView } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { Message, Option } from '../types';
 import { useCalendar } from '../hooks/useCalendar';
+import { ImageIcons } from '@/utils/ImageIcons';
+import { getGender } from 'gender-detection-from-name';
 
 interface MessageListProps {
   messages: Message[];
@@ -13,6 +15,7 @@ interface MessageListProps {
   onOptionSelect: (option: string | Option) => void;
   flatListRef: React.RefObject<FlatList<Message> | null>;
   currentStep: string;
+  user: string;
 }
 
 export default function GlobalMessageList({
@@ -20,11 +23,13 @@ export default function GlobalMessageList({
   isWaitingForResponse,
   onOptionSelect,
   flatListRef,
-  currentStep
+  currentStep,
+  user
 }: MessageListProps) {
   const { createDeviceEvent, events } = useCalendar();
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
   const [createdEventIds, setCreatedEventIds] = useState<Set<string>>(new Set());
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
@@ -32,6 +37,29 @@ export default function GlobalMessageList({
     setTimeout(() => {
       setCopiedStates((prev) => ({ ...prev, [key]: false }));
     }, 3000);
+  };
+
+  const extractContactName = (content: string): string => {
+    // Look for patterns like "Hi [Name]," or "Hello [Name]," or just "[Name],"
+    const namePatterns = [
+      /Hi\s+([^,]+),/i,
+      /Hello\s+([^,]+),/i,
+      /Dear\s+([^,]+),/i,
+      /^([^,\n]+),/m  // Name at the start of a line followed by comma
+    ];
+
+    for (const pattern of namePatterns) {
+      const match = content.match(pattern);
+      if (match && match[1] && match[1].trim().length > 0) {
+        const name = match[1].trim();
+        // Make sure it's not a generic greeting like "Hi there," or "Hi team,"
+        if (!['there', 'team', 'everyone'].includes(name.toLowerCase())) {
+          return name;
+        }
+      }
+    }
+
+    return '';
   };
 
   const handleCreateCalendarEvent = async (message: Message) => {
@@ -67,14 +95,21 @@ export default function GlobalMessageList({
       // Calculate end date (1 hour after start time)
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
-      const title = `[Zirkl Ai]`;
+      // Extract contact name from message content
+      const contactName = extractContactName(message.content || '');
+
+      // Create title with contact name if available
+      const title = contactName
+        ? `[Zirkl Ai] Reminder for ${contactName}`
+        : `[Zirkl Ai]`;
 
       await createDeviceEvent({
         title,
         startDate,
         endDate,
         location: 'remote',
-        notes: message.content
+        notes: message.content,
+        reminders: [10, 30] // 10 and 30 minutes before the event
       });
 
       // Track that this message has an event created
@@ -112,7 +147,7 @@ export default function GlobalMessageList({
           // Handle ### headers
           if (part.startsWith('### ')) {
             return (
-              <Text key={index} className="text-black text-lg font-bold mb-2 mt-1 leading-6">
+              <Text key={index} className="text-white text-lg font-bold mb-2 mt-1 leading-6">
                 {part.slice(4).trim()}
               </Text>
             );
@@ -122,11 +157,11 @@ export default function GlobalMessageList({
           if (part.includes('**')) {
             const boldParts = part.split(/(\*\*.*?\*\*)/g);
             return (
-              <Text key={index} className="text-black text-base leading-5">
+              <Text key={index} className="text-white text-base leading-5">
                 {boldParts.map((boldPart, boldIndex) => {
                   if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
                     return (
-                      <Text key={boldIndex} className="font-bold text-black">
+                      <Text key={boldIndex} className="font-bold text-white">
                         {boldPart.slice(2, -2)}
                       </Text>
                     );
@@ -139,7 +174,7 @@ export default function GlobalMessageList({
 
           // Regular text
           return (
-            <Text key={index} className="text-black text-base leading-5 mb-1">
+            <Text key={index} className="text-white text-base leading-5 mb-1">
               {part}
             </Text>
           );
@@ -150,15 +185,20 @@ export default function GlobalMessageList({
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user';
-    const time12 = formatUtcToIstTime(item.timestamp);
+    // const time12 = formatUtcToIstTime(item.timestamp);
     const isAssistant = item.role === 'assistant';
     const content = item.content || '';
+
+    const gender = getGender(user.split(" ")[0], "en");
+    const randomUserIcon = gender === 'male' ? ImageIcons.MenImage : ImageIcons.WomanImage;
 
     // --- Parsing Logic ---
     let isComplexAssistantMessage = false;
     if (isAssistant && typeof content === 'string') {
       let introText = '';
+      let reminderText = '';
       let suggestionMessages: string[] = [];
+      let suggestionOnly: string[] = [];
       let adviceOrTips: string[] = [];
 
       // Regex to split by "For..." or "Coach Tip:". It looks for one or more newlines.
@@ -173,11 +213,15 @@ export default function GlobalMessageList({
 
       if (mainContent.match(messageGroupRegex)) {
         suggestionMessages = mainContent.split(messageGroupRegex).filter((msg: string) => msg.trim());
+        reminderText = suggestionMessages.find(msg => msg.startsWith("Perfect! I'll remind you")) || '';
+        suggestionOnly = suggestionMessages.filter(
+  msg => msg.startsWith('Message 1:') || msg.startsWith('Message 2:') || msg.startsWith('Message 3:')
+);
         isComplexAssistantMessage = true;
       } else if (mainContent.match(numberedListRegex)) {
         const numberedListParts = mainContent.split(numberedListRegex);
         introText = numberedListParts[0].trim();
-        suggestionMessages = numberedListParts.slice(1).map((p: string) => p.trim());
+        suggestionMessages = numberedListParts.slice(1).map((p: string) => p.trim());        
         isComplexAssistantMessage = true;
       } else {
         introText = mainContent.trim();
@@ -186,97 +230,125 @@ export default function GlobalMessageList({
       // If we found any special formatting, use the complex renderer
       if (isComplexAssistantMessage || adviceOrTips.length > 0) {
         return (
-          <View className={`flex-col items-start mb-4`}>
-          {introText && (
-            <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-2xl px-6 py-4 mb-4 shadow-sm">
-              <View className="mb-2">
-                {renderFormattedText(introText)}
-              </View>
-
-              {/* Calendar button for messages with start_time */}
-              {item.start_time && !createdEventIds.has(item.start_time) && (
-                <TouchableOpacity
-                  className="absolute right-2 top-2"
-                  onPress={() => handleCreateCalendarEvent(item)}
-                >
-                  <Text className="text-gray-500 text-xs">📅</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-          {suggestionMessages.map((msg: string, idx: number) => {
-            const copyKey = `msg-${index}-${idx}`;
-            const isCopied = copiedStates[copyKey];
-            const trimmedMsg = msg.trim();
-
-            return (
-              <View
-                key={idx}
-                className="max-w-[85%] flex-row items-start mb-4 border bg-[#F6F4FF] border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm"
-              >
-                <View style={{ flex: 1 }}>
-                  <View className="mb-2">
-                    {renderFormattedText(trimmedMsg)}
-                  </View>
-                  <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text>
+          <View className={`flex-row mb-4`}>
+          <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
+          <View className="flex-col items-start mb-4">
+            {introText && (
+              <View className="w-80 self-start border bg-black/15 border-[#DADADA] rounded-2xl px-6 py-4 mb-4 shadow-sm">
+                <View className="mb-2">
+                  {renderFormattedText(introText)}
                 </View>
-
-                {/* Only show copy icon for Message 1, 2, 3 parts */}
-                {(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && (
-                  <TouchableOpacity
-                    className="absolute right-2 top-2"
-                    onPress={() => handleCopy(trimmedMsg, copyKey)}
-                  >
-                    <MaterialIcons
-                      name={isCopied ? "check" : "content-copy"}
-                      size={18}
-                      color={isCopied ? "#10B981" : "#9CA3AF"}
-                    />
-                  </TouchableOpacity>
-                )}
 
                 {/* Calendar button for messages with start_time */}
-                {item.start_time && !(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && !createdEventIds.has(item.start_time) && (
+                {item.start_time && !createdEventIds.has(item.start_time) && (
                   <TouchableOpacity
-                    className="absolute right-2 top-2"
+                    className="absolute right-2 top-2 bg-blue-50 border border-blue-200 rounded-full p-1.5"
                     onPress={() => handleCreateCalendarEvent(item)}
                   >
-                    <Text className="text-gray-500 text-lg">📅</Text>
+                    <MaterialIcons name="event" size={14} color="#3B82F6" />
                   </TouchableOpacity>
                 )}
               </View>
-            );
-          })}
-          {adviceOrTips.map((tip: string, idx: number) => {
-            const trimmedTip = tip.trim();
-            return (
-              <View key={`tip-${idx}`} className="w-full flex-row items-start mb-4">
-                <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm">
-                  <View style={{ flex: 1 }} className="mb-2">
-                    {renderFormattedText(trimmedTip)}
-                  </View>
+            )}
+            {reminderText && (
+              <View className="w-80 self-start border bg-black/15 border-[#DADADA] rounded-2xl px-6 py-4 mb-4 shadow-sm">
+                <View className="mb-2">
+                  {renderFormattedText(reminderText)}
                 </View>
               </View>
-            );
-          })}
+            )}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {suggestionOnly.map((msg: string, idx: number) => {
+                const copyKey = `msg-${index}-${idx}`;
+                const isCopied = copiedStates[copyKey];
+                const trimmedMsg = msg.trim();
+                console.log(trimmedMsg);
+
+                return (
+                    <View
+                      key={idx}
+                      className="w-80 flex-row items-center mr-4 mb-4 border bg-[#5248A0] border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm"
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View className="mb-2">
+                          {renderFormattedText(trimmedMsg)}
+                        </View>
+                        {/* <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text> */}
+                      </View>
+
+                      {/* Only show copy icon for Message 1, 2, 3 parts */}
+                      
+                      {(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && (
+                        <TouchableOpacity
+                          className="absolute right-2 top-2"
+                          onPress={() => handleCopy(trimmedMsg, copyKey)}
+                        >
+                          <MaterialIcons
+                            name={isCopied ? "check" : "content-copy"}
+                            size={18}
+                            color={isCopied ? "#10B981" : "#9CA3AF"}
+                          />
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Calendar button for messages with start_time */}
+                      {item.start_time && !(trimmedMsg.includes('Message 1:') || trimmedMsg.includes('Message 2:') || trimmedMsg.includes('Message 3:')) && !createdEventIds.has(item.start_time) && (
+                        <TouchableOpacity
+                          className="absolute right-2 top-2 bg-blue-50 border border-blue-200 rounded-full p-1.5"
+                          onPress={() => handleCreateCalendarEvent(item)}
+                        >
+                          <MaterialIcons name="event" size={14} color="#3B82F6" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                );
+              })}
+            </ScrollView>
+            {adviceOrTips.map((tip: string, idx: number) => {
+              const trimmedTip = tip.trim();
+              return (
+                <View key={`tip-${idx}`} className="w-full flex-col items-start mb-4">
+                  <View className="w-80 flex-row items-start border bg-black/5 border-[#DADADA] rounded-2xl px-6 py-4 shadow-sm">
+                    <View style={{ flex: 1 }} className="mb-2">
+                      {renderFormattedText(trimmedTip)}
+                    </View>
+                  </View>
+
+                  {/* Calendar button for coach tips with start_time */}
+                  {item.start_time && !createdEventIds.has(item.start_time) && (
+                    <TouchableOpacity
+                      className="mt-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 self-start"
+                      onPress={() => handleCreateCalendarEvent(item)}
+                    >
+                      <View className="flex-row items-center">
+                        <MaterialIcons name="event" size={14} color="#3B82F6" />
+                        <Text className="text-blue-600 text-sm font-medium ml-1">Add to Calendar</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </View>
         </View>
         );
       }
     }
     
     // --- Fallback and other message type rendering ---
-    if (isAssistant && item.options && item.type === 'flow') {
+    if (isAssistant && item.options && item?.type?.startsWith('flow')) {
       return (
-        <View className={`flex-col items-start mb-4`}>
-          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 shadow-sm">
-            <Text className="text-base mb-3">
+        <View className={`flex-row items-start mb-4`}>
+          <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
+          <View className="w-80 border bg-black/15 border-[#DADADA] rounded-xl px-5 py-3 shadow-sm">
+            <Text className="text-white text-base mb-3">
               {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
             </Text>
 
             <View className="flex-row flex-wrap justify-between">
               {item?.options?.map((opt: any, index: number) => {
                 const cardClasses = opt.enabled
-                  ? "bg-white border border-gray-300"
+                  ? "bg-[#5248A0] border border-gray-300"
                   : "bg-gray-50 border border-gray-200 opacity-50";
 
                 return (
@@ -287,40 +359,57 @@ export default function GlobalMessageList({
                     className={`w-[48%] mb-3 rounded-xl p-3 ${cardClasses}`}
                   >
                     <Text className="text-2xl">{opt.emoji}</Text>
-                    <Text className="font-semibold text-base">{opt.title}</Text>
-                    <Text className="text-xs text-gray-500">{opt.subtitle}</Text>
+                    <Text className="text-white font-semibold text-base">{opt.title}</Text>
+                    <Text className="text-xs text-white">{opt.subtitle}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            <Text className='text-black text-xs text-right mt-2'>{time12}</Text>
+            {/* <Text className='text-white text-xs text-right mt-2'>{time12}</Text> */}
           </View>
         </View>
       );
     } else if (isAssistant && item.options && (item.type === 'option' || item.type === 'confirmation')) {
       return (
-        <View className={`flex-col items-start mb-4`}>
-          <View className="max-w-[85%] border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3">
-            <Text className="text-black text-base mb-3">
-              {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
-            </Text>
-            <View className="flex-row flex-wrap justify-between">
-              {item?.options?.map((opt: any, index: number) => {
-                const cardClasses = "bg-white border border-gray-300";
-
-                return (
-                  <TouchableOpacity
-                    key={index} 
-                    onPress={() => onOptionSelect(opt)}
-                    className={`w-[48%] mb-3 rounded-xl p-3 ${cardClasses}`}
-                  >
-                    <Text className="font-semibold text-base">{opt.name}</Text>
-                    <Text className="text-xs text-gray-500">{opt.phoneNumber}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+        <View className={`flex-row items-start`}>
+          <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
+          <View className='flex-col items-start mb-4 gap-4'>
+            <View className="w-80 border bg-black/15 border-[#DADADA] rounded-xl px-5 py-3">
+              <Text className="text-white text-base mb-3">
+                {item.content ? item.content : "Welcome to Zirkl Global Chat! How can I assist you today?"}
+              </Text>
+              {/* <Text className='text-white text-xs text-right'>{time12}</Text> */}
             </View>
-            <Text className='text-black text-xs text-right'>{time12}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {item?.options?.map((opt: any, index: number) => {
+                const gender = getGender(opt.name, "en");
+                const randomUserIcon = gender === "male" ? ImageIcons.MenImage : ImageIcons.WomanImage;
+                return (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => onOptionSelect(opt)}
+                  className="w-[90px] h-24 mb-3 rounded-xl bg-[#5248A0] border border-gray-300 items-center p-2 mr-4"
+                >
+                  {/* Avatar/Image */}
+                  {randomUserIcon && (
+                    <Image
+                      source={randomUserIcon}
+                      className="w-6 h-6 rounded-full mb-2"
+                    />
+                  )}
+
+                  {/* Name (centered) */}
+                  <Text className="font-semibold text-xs text-white mb-1">{opt.name.slice(0, 10)}</Text>
+
+                  {/* Select Button */}
+                  <View className="flex-row gap-2 items-center border-t border-gray-300 pt-2">
+                    <MaterialIcons name="phone" size={12} color="#bfaefe" />
+                    <Text className="text-xs text-white font-semibold">Select</Text>
+                  </View>
+                </TouchableOpacity>
+                )})}
+            </ScrollView>
+
           </View>
         </View>
       );
@@ -328,22 +417,23 @@ export default function GlobalMessageList({
       // Normal single message (user or assistant)
       return (
         <View className={`flex-row ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start mb-4`}>
-          <View className={`max-w-[85%] border ${isUser ? 'bg-white border-[#E2E2E2]' : 'bg-[#F6F4FF] border-[#DADADA]'} rounded-2xl px-6 py-4 shadow-sm`}>
+          {isUser ? <Image source={randomUserIcon} className="w-10 h-10 ml-2 rounded-full" /> : <Image source={ImageIcons.Assistant} className="w-10 h-10 ml-2 rounded-full" />}
+          <View className={`w-80 text-white ${isUser ? 'bg-[#C6BFFF]/10' : 'bg-black/15 border border-white/10'} rounded-2xl px-6 py-4 shadow-sm`}>
             <View className="mb-2">
-              <Text className={`text-black text-base leading-5`}>{item.content}</Text>
+              <Text className={`text-white text-base leading-5`}>{item.content}</Text>
             </View>
 
             {/* Calendar button for messages with start_time */}
             {isAssistant && item.start_time && !createdEventIds.has(item.start_time) && (
               <TouchableOpacity
-                className="absolute right-2 top-2"
+                className="absolute right-2 top-2 bg-blue-50 border border-blue-200 rounded-full p-1.5"
                 onPress={() => handleCreateCalendarEvent(item)}
               >
-                <Text className="text-gray-500 text-xs">📅</Text>
+                <MaterialIcons name="event" size={14} color="#3B82F6" />
               </TouchableOpacity>
             )}
 
-            <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text>
+            {/* <Text className='text-gray-500 text-xs text-right mt-1'>{time12}</Text> */}
           </View>
           {item.options && (
             <View className="flex mt-3 gap-2">
@@ -354,7 +444,7 @@ export default function GlobalMessageList({
                     key={`option-${index}-${optionIndex}-${optionText}`}
                     onPress={() => onOptionSelect(option)}
                     disabled={isWaitingForResponse || item.next_step !== currentStep}
-                    className={`bg-[#444A8E] rounded-lg px-5 py-3 ${isWaitingForResponse ? 'opacity-50' : ''}`}
+                    className={`bg-[#5248A0] rounded-lg px-5 py-3 ${isWaitingForResponse ? 'opacity-50' : ''}`}
                   >
                     <Text className="text-white text-start font-medium">{optionText}</Text>
                   </TouchableOpacity>
@@ -379,6 +469,26 @@ export default function GlobalMessageList({
     }
   }, [messages, flatListRef]);
 
+  // Keyboard handling
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [flatListRef]);
+
   return (
     <FlatList
       data={messages}
@@ -386,6 +496,7 @@ export default function GlobalMessageList({
       showsVerticalScrollIndicator={false}
       ref={flatListRef}
       keyboardShouldPersistTaps='handled'
+      contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 100 : 0 }}
       renderItem={({ item, index }) => {
         return renderMessage({ item, index });
       }}

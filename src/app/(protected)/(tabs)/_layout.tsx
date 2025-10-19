@@ -1,6 +1,7 @@
 import CrystalSphereButton from '@/components/CrystalSphereButton';
-import { Fontisto, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome, Fontisto, MaterialIcons, Octicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { router } from 'expo-router';
 import { View } from 'react-native';
 
 
@@ -8,12 +9,21 @@ export default function TabsLayout() {
     return (
         <Tabs
             screenOptions={({ route }) => {
-                const hiddenRoute = route.name === 'chats/[id]/index';
+                const hiddenRoute = route.name === 'chats/[id]/index' || route.name === 'global-chat/index';
                 return {
                     headerShown: false,
-                    tabBarStyle: hiddenRoute ? { display: 'none' } : { backgroundColor: '#FFFFFF', height: 80, paddingTop: 10 },
+                    tabBarStyle: hiddenRoute ? { display: 'none' } : {
+                        backgroundColor: '#FFFFFF',
+                        height: 90,
+                        paddingTop: 8,
+                    },
                     tabBarActiveTintColor: '#4725FC',
-                    tabBarInactiveTintColor: '#35383E'
+                    tabBarInactiveTintColor: '#9CA3AF',
+                    tabBarLabelStyle: {
+                        fontSize: 11,
+                        fontWeight: '500',
+                        marginTop: 4,
+                    },
                 }
             }}
         >
@@ -22,14 +32,10 @@ export default function TabsLayout() {
                 options={{
                     tabBarLabel: 'Home',
                     tabBarIcon: ({ color, size }) => (
-                        <View className="items-center">
-                            <MaterialIcons name="home" color={color} size={size} />
+                        <View className="items-center justify-center" style={{ width: 50, height: 50 }}>
+                            <Octicons name="home" color={color} size={size} />
                         </View>
                     ),
-                    tabBarLabelStyle: {
-                        fontSize: 10,
-                        fontWeight: '400',
-                    },
                 }}
             />
             <Tabs.Screen
@@ -37,42 +43,41 @@ export default function TabsLayout() {
                 options={{
                     tabBarLabel: 'Chat',
                     tabBarIcon: ({ color, size }) => (
-                        <View className="items-center">
-                            <MaterialIcons name="chat" color={color} size={size} />
+                        <View className="items-center justify-center" style={{ width: 50, height: 50 }}>
+                            <MaterialIcons name="chat-bubble-outline" color={color} size={size} />
                         </View>
                     ),
-                    tabBarLabelStyle: {
-                        fontSize: 10,
-                        fontWeight: '400',
-                    },
                 }}
             />
-            {/* Center Floating Button (e.g., Add) */}
+            {/* Center Floating Button */}
             <Tabs.Screen
                 name="global-chat/index"
                 options={{
                     tabBarLabel: '',
-                    tabBarButton: (props) => (
-                    <View style={{
-                        alignSelf: 'center',
-                        bottom: 30,
-                    }}>
-                        <CrystalSphereButton onPress={props.onPress} />
-                    </View>
+                    tabBarButton: () => (
+                        <View style={{
+                            alignSelf: 'center',
+                            bottom: 35,
+                            elevation: 10,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 8,
+                        }}>
+                            <CrystalSphereButton onPress={() => router.push('/(protected)/(tabs)/global-chat')} />
+                        </View>
                     )
                 }}
             />
             <Tabs.Screen
-                name="notifications/index"
+                name="journal/index"
                 options={{
-                    tabBarLabel: 'Notifications',
+                    tabBarLabel: 'Journal',
                     tabBarIcon: ({ color, size }) => (
-                        <Fontisto name="bell" color={color} size={size} />
+                        <View className="items-center justify-center" style={{ width: 50, height: 50 }}>
+                            <FontAwesome name="microphone" color={color} size={size} />
+                        </View>
                     ),
-                    tabBarLabelStyle: {
-                        fontSize: 10,
-                        fontWeight: '400',
-                    },
                 }}
             />
             <Tabs.Screen
@@ -80,16 +85,20 @@ export default function TabsLayout() {
                 options={{
                     tabBarLabel: 'Profile',
                     tabBarIcon: ({ color, size }) => (
-                        <MaterialIcons name="person-outline" color={color} size={size} />
+                        <View className="items-center justify-center" style={{ width: 50, height: 50 }}>
+                            <Fontisto name="person" color={color} size={size} />
+                        </View>
                     ),
-                    tabBarLabelStyle: {
-                        fontSize: 10,
-                        fontWeight: '400',
-                    },
                 }}
             />
             <Tabs.Screen
                 name="chats/[id]/index"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="notifications/index"
                 options={{
                     href: null,
                 }}

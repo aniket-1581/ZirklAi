@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getNudges } from '@/api/profile';
+import { deleteNudge, getNudges } from '@/api/profile';
 
 export interface Nudge {
   _id: string;
@@ -35,6 +35,22 @@ export const useNudges = () => {
     }
   }, []);
 
+  const deleteNudgeById = async (token: string, nudgeId: string) => {
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await deleteNudge(token, nudgeId);
+      await fetchNudges(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete nudge');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const copyToClipboard = useCallback(async (text: string) => {
     try {
       // For React Native, we'll use the Clipboard API if available
@@ -51,6 +67,7 @@ export const useNudges = () => {
     loading,
     error,
     fetchNudges,
-    copyToClipboard
+    copyToClipboard,
+    deleteNudgeById
   };
 };

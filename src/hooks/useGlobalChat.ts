@@ -7,11 +7,13 @@ import {
 } from '@/api/global-chat';
 import { useAuth } from '@/context/AuthContext';
 import { Message, Option } from '@/types';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 export function useGlobalChat() {
   const { token } = useAuth();
+  const isFocused = useIsFocused();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -19,11 +21,12 @@ export function useGlobalChat() {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
 
+  // Ensure we only trigger returning message once per entry (focus) session
+  const hasTriggeredReturningRef = useRef(false);
+
   const normalizeMessages = (data: any): Message[] => {
     console.log("Normalizing messages:", data);
-    if (!data) {
-      return [];
-    }
+    if (!data) return [];
 
     let messageList: any[] = [];
     if (Array.isArray(data)) {
@@ -34,7 +37,6 @@ export function useGlobalChat() {
       messageList = data.messages;
     }
 
-    // Ensure all items are objects with a 'content' property
     return messageList.map((item) =>
       typeof item === 'string' ? { role: 'assistant', content: item, timestamp: new Date() } : item
     );
@@ -48,44 +50,33 @@ export function useGlobalChat() {
     }
   }, [token]);
 
-  const loadHistory = useCallback(async () => {
+  // onEnter flag decides whether to trigger returning message once
+  const loadHistory = useCallback(async (onEnter: boolean = false) => {
     if (!token) return;
     setIsLoading(true);
     try {
+      if (onEnter && !hasTriggeredReturningRef.current) {
+        try {
+          await getReturningMessage(token);
+          hasTriggeredReturningRef.current = true;
+        } catch {
+          console.warn('Returning message fetch failed');
+        }
+      }
+
       const history = await getGlobalChatHistory(token);
       console.log("Fetched history:", history);
       const normalized = normalizeMessages(history);
+
       if (normalized.length > 0) {
-        const lastMessage = normalized[normalized.length - 1];
-
-        const shouldAddReturningMessage =
-          lastMessage?.options?.length === 0 &&
-          lastMessage?.type !== 'flow' &&
-          lastMessage?.timestamp < new Date(Date.now() - 60 * 60 * 1000);
-
-        if (shouldAddReturningMessage) {
-          try {
-            const returning = await getReturningMessage(token);
-            if (returning?.message) {
-              setMessages([
-                { role: 'assistant', content: returning.message, timestamp: new Date() },
-                ...normalized,
-              ]);
-              return;
-            }
-          } catch {
-            console.warn('Returning message fetch failed');
-          }
-        } else {
-          setMessages(normalized);
-        }
+        setMessages(normalized);
       } else {
         await loadWelcomeMessage();
-        const history = await getGlobalChatHistory(token);
-        console.log("Fetched history after welcome message:", history);
-        const normalized = normalizeMessages(history);
-        if (normalized.length > 0) {
-          setMessages(normalized);
+        const historyAfterWelcome = await getGlobalChatHistory(token);
+        console.log("Fetched history after welcome message:", historyAfterWelcome);
+        const normalizedAfterWelcome = normalizeMessages(historyAfterWelcome);
+        if (normalizedAfterWelcome.length > 0) {
+          setMessages(normalizedAfterWelcome);
         }
       }
     } catch (error) {
@@ -104,7 +95,6 @@ export function useGlobalChat() {
     setUserInput('');
     setIsWaitingForResponse(true);
 
-    // Optimistically add the user message
     setMessages((prev) => [
       ...prev,
       {
@@ -115,7 +105,6 @@ export function useGlobalChat() {
     ]);
 
     try {
-      // Kick off transient loading messages while waiting
       (async () => {
         try {
           setLoadingMessages([]);
@@ -128,13 +117,12 @@ export function useGlobalChat() {
             }
           }
         } catch {
-          // Ignore loading message failures
           console.warn('Loading messages fetch failed');
         }
       })();
 
       await globalChatWithLlm(input, token);
-      await loadHistory();
+      await loadHistory(); // not onEnter
     } catch (error) {
       console.error('Global chat failed:', error);
       Alert.alert('Error', 'Failed to send message.');
@@ -148,16 +136,21 @@ export function useGlobalChat() {
     if (!token || isWaitingForResponse) return;
 
     const text = typeof option === 'string' ? option : (option as any).name ? (option as any).name : (option as any).title;
-
-    // We can reuse the logic from handleTextSubmit
     await handleTextSubmit(text);
   };
 
+  // Trigger on focus so re-entering the chat runs the returning check
   useEffect(() => {
-    if (token) {
-      loadHistory();
+    if (isFocused && token) {
+      // Treat every focus as a fresh entry
+      hasTriggeredReturningRef.current = false;
+      loadHistory(true);
     }
-  }, [token, loadHistory]);
+    // On blur/unmount, reset so next focus can trigger again
+    return () => {
+      hasTriggeredReturningRef.current = false;
+    };
+  }, [isFocused, token, loadHistory]);
 
   return {
     messages,

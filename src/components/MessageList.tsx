@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Keyboard } from 'react-native';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
 import { Message, Option } from '../types';
 
@@ -29,6 +29,8 @@ export default function MessageList({
   currentStep
 }: MessageListProps) {
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
   // Use a useEffect hook to automatically scroll to the end
   useEffect(() => {
     if (flatListRef.current) {
@@ -40,7 +42,27 @@ export default function MessageList({
         }
       }, 100); 
     }
-  }, [messages]);
+  }, [messages, flatListRef]);
+
+  // Keyboard handling
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [flatListRef]);
 
   return (
     <FlatList
@@ -50,6 +72,7 @@ export default function MessageList({
       showsVerticalScrollIndicator={false}
       ref={flatListRef}
       keyboardShouldPersistTaps='handled'
+      contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 100 : 0 }}
       renderItem={({ item, index }) => {
         const isSystem = item.role === 'assistant';
         return (

@@ -1,31 +1,55 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const SIZE = 80; // increased size for a more "orb" feel
+const SIZE = 70;
 
 const COLORS = {
-  primary: 'rgba(147, 51, 234, 1)', // vibrant purple
-  secondary: 'rgba(99, 102, 241, 1)', // indigo-purple
-  accent: 'rgba(168, 85, 247, 1)', // bright purple
-  highlight: 'rgba(196, 181, 253, 1)', // light purple highlight
-  blend1: 'rgba(147, 197, 253, 1)', // soft blue
+  primary: '#414AFF',
+  secondary: '#DE26FF'
 };
 
 export default function CrystalSphereButton({ onPress }: { onPress?: () => void }) {
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Continuous rotation
-    Animated.loop(
+    const rotationLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 10000,
+        duration: 8000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
-  }, []);
+    );
+
+    // Subtle pulse animation
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    rotationLoop.start();
+    pulseLoop.start();
+
+    return () => {
+      rotationLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [rotateAnim, pulseAnim]);
 
   // Interpolations
   const rotation = rotateAnim.interpolate({
@@ -34,69 +58,78 @@ export default function CrystalSphereButton({ onPress }: { onPress?: () => void 
   });
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPress}
+      style={styles.touchable}
+    >
       <View style={styles.wrapper}>
 
-        {/* Sphere */}
-        <Animated.View style={[styles.container, { transform: [{ rotate: rotation }] }]}>
+        {/* Main sphere */}
+        <View style={[
+          styles.container
+        ]}>
           <LinearGradient
-            colors={['#93c5fd', '#6366f1', '#a855f7']}
+            colors={[COLORS.primary, COLORS.secondary]}
             style={styles.innerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           />
-          {/* Shine highlight */}
-          <LinearGradient
-            colors={['rgba(255,255,255,0.9)', 'transparent']}
-            style={styles.highlight}
-            start={{ x: 0.2, y: 0.2 }}
-            end={{ x: 0.8, y: 0.8 }}
-          />
-        </Animated.View>
+
+          {/* Z Brand Letter */}
+          <Text style={styles.brandLetter}>Z</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  glow: {
-    position: 'absolute',
-    width: SIZE * 1.3,
-    height: SIZE * 1.3,
-    borderRadius: SIZE,
+  touchable: {
+    width: SIZE + 20,
+    height: SIZE + 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  glowGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: SIZE * 2,
+  wrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   container: {
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,
-    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    borderColor: "rgba(147, 51, 234, 0.3)",
-    borderWidth: 2,
-
-    elevation: 8,
+    borderColor: COLORS.secondary,
+    borderWidth: 1.5,
+    elevation: 12,
+    shadowColor: COLORS.secondary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
   },
   innerGradient: {
-    width: SIZE * 2,
-    height: SIZE * 2,
+    width: SIZE * 1.8,
+    height: SIZE * 1.8,
     borderRadius: SIZE,
     position: 'absolute',
-    top: -SIZE / 2,
-    left: -SIZE / 2,
+    top: -SIZE * 0.4,
+    left: -SIZE * 0.4,
   },
   highlight: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: SIZE / 2,
+  },
+  brandLetter: {
+    fontSize: SIZE * 0.45,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    zIndex: 10,
   },
 });

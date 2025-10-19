@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import * as Calendar from "expo-calendar";
 import { useAuth } from "@/context/AuthContext";
+import { CalendarEventSyncRequest, syncCalendarEvents } from "@/api/calendar";
 
 
 export function useCalendar() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [calendars, setCalendars] = useState<Calendar.Calendar[]>([]);
   const [writableCalendars, setWritableCalendars] = useState<Calendar.Calendar[]>([]);
   const [defaultCalendarId, setDefaultCalendarId] = useState<string | null>(null);
@@ -29,7 +30,8 @@ export function useCalendar() {
       const fetched = await Calendar.getEventsAsync([defaultCalendarId], start, end);
 
       // Filter events to only include those with title "[Zirkl Ai]"
-      const zirklAiEvents = fetched.filter(event => event.title === "[Zirkl Ai]");
+      const zirklAiEvents = fetched.filter(event => event.title.startsWith("[Zirkl Ai]"));
+      console.log("Zirkl Ai Events", zirklAiEvents);
 
       setEvents(zirklAiEvents);
     } catch (err) {
@@ -60,6 +62,7 @@ export function useCalendar() {
     endDate: Date;
     location?: string;
     notes?: string;
+    reminders?: number[]; // Array of minutes before event to remind (e.g., [10, 30])
   }) => {
     if (!defaultCalendarId) throw new Error("No default calendar");
 
@@ -70,6 +73,10 @@ export function useCalendar() {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       location: event.location,
       notes: event.notes,
+      alarms: event.reminders?.map(minutes => ({
+        relativeOffset: -minutes, // Negative offset means minutes before the event
+        method: Calendar.AlarmMethod.DEFAULT, // Use default reminder method (notification/sound)
+      })) || [],
     };
 
     try {
@@ -80,6 +87,41 @@ export function useCalendar() {
       throw new Error(err.message || "Error creating device event");
     }
   };
+
+  const syncEventsToBackend = useCallback(async (eventsToSync: Calendar.Event[]): Promise<SyncEventsResponse> => {
+    if (!token) {
+      throw new Error("User not authenticated");
+    }
+    
+    try {
+      console.log("Syncing events to backend", eventsToSync);
+      const eventsForBackend: CalendarEventSyncRequest = {
+        device_events: eventsToSync.map(event => {
+          return {
+            title: event.title,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            timeZone: event.timeZone,
+            location: event.location,
+            notes: event.notes
+          };
+        })
+      };
+
+      const syncResult = await syncCalendarEvents(eventsForBackend, token);
+      console.log(`Synced ${syncResult.synced_count} events`);
+      
+      return syncResult;
+    } catch (error) {
+      console.error('Error syncing events to backend:', error);
+      throw error;
+    }
+  }, [token]);
+
+  useEffect(() => {
+    syncEventsToBackend(events);
+    console.log("Events synced to backend");
+  }, [events]);
 
   return {
     calendars,

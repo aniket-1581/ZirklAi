@@ -1,4 +1,4 @@
-const BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1`;
+const BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1` || 'https://netmate.mettasocial.com/api/v1';
 
 export async function getProfileStatus(token: string) {
   const res = await fetch(`${BASE_URL}/onboarding/status`, {
@@ -75,5 +75,19 @@ export async function getNudges(token: string) {
     },
   });
   if (!res.ok) throw new Error("Failed to fetch nudges");
+  return res.json();
+}
+
+export async function deleteNudge(token: string, nudgeId: string) {
+  const res = await fetch(`${BASE_URL}/profile/nudge-data/${nudgeId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ nudgeId }),
+  });
+  if (!res.ok) throw new Error("Failed to delete nudge");
   return res.json();
 }

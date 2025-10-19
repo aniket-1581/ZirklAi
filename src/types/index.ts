@@ -11,7 +11,7 @@ export interface Message {
   timestamp: Date;
   next_step?: string;
   step?: string;
-  type?: 'text' | 'flow';
+  type?: 'text' | 'flow' | 'option' | 'flow_returning' | 'flow_welcome';
   start_time?: string;
 }
 

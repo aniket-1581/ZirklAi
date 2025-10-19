@@ -1,4 +1,4 @@
-const BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1`;
+const BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1` || 'https://netmate.mettasocial.com/api/v1';
 
 export async function getDraftMessageSuggestions(note_id: string, token: string, goal: string) {
     const res = await fetch(`${BASE_URL}/chat/get_message_draft_suggestion_llm/${note_id}?goals=${goal}`, {

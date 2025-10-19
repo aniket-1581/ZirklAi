@@ -1,4 +1,4 @@
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://netmate.mettasocial.com';
 
 export async function getUser(token: string) {
     const res = await fetch(`${BASE_URL}/me`, {

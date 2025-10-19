@@ -55,7 +55,7 @@ function AppLayout() {
 
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style="auto" hidden />
       <Slot />
       <Toast />
     </>

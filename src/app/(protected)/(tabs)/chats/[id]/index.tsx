@@ -7,24 +7,39 @@ import {
   postNoteChatHistory,
 } from "@/api/chat";
 import { getNoteById } from "@/api/notes";
+import CrystalSphereButton from "@/components/CrystalSphereButton";
 import KeyboardLayout from "@/components/KeyboardAvoidingLayout";
 import TypingIndicator from "@/components/TypingIndicator";
 import { useAuth } from "@/context/AuthContext";
 import { ImageIcons } from "@/utils/ImageIcons";
 import { formatUtcToIstTime } from "@/utils/date";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { getGender } from "gender-detection-from-name";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
-  ImageBackground,
+  Image,
   Keyboard,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const femaleUserIcon = [
+  ImageIcons.GirlImage,
+  ImageIcons.GirlImage2,
+  ImageIcons.GirlImage3,
+  ImageIcons.GirlImage4,
+];
+const maleUserIcon = [
+  ImageIcons.BoyImage,
+  ImageIcons.BoyImage2,
+  ImageIcons.BoyImage3,
+];
 
 export default function ChatScreen() {
   const { id, draftMessage } = useLocalSearchParams<{
@@ -36,13 +51,27 @@ export default function ChatScreen() {
   const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
-  const flatListRef = useRef(null);
+  const flatListRef = useRef<FlatList | null>(null);
   const { token } = useAuth();
   const [note, setNote] = useState<any>(null);
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>(
     {}
   );
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const router = useRouter();
+
+  const randomFemaleUserIcon = useMemo(() =>
+    femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)],
+    []
+  );
+  const randomMaleUserIcon = useMemo(() =>
+    maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)],
+    []
+  );
+  const gender = useMemo(() =>
+    getGender(note?.contact_name?.split(" ")[0], "en"),
+    [note?.contact_name]
+  );
 
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
@@ -53,9 +82,9 @@ export default function ChatScreen() {
   };
 
   const renderFormattedText = (text: string) => {
-    const parts = text.split(/(\*.*?\*)/g);
+    const parts = text?.split(/(\*.*?\*)/g);
     return (
-      <Text className="text-black text-base">
+      <Text className="text-white text-base">
         {parts.map((part, index) => {
           if (part.startsWith("*") && part.endsWith("*")) {
             return (
@@ -105,8 +134,8 @@ export default function ChatScreen() {
             lastMessage &&
             lastMessage.type !== "loading" &&
             lastMessage.role !== "user" &&
-            lastMessage.timestamp.split("T")[0] !==
-              new Date().toISOString().split("T")[0]
+            lastMessage.timestamp?.split("T")[0] !==
+              new Date().toISOString()?.split("T")[0]
           ) {
             const returningMsg = (await getReturningMessage()) as any;
             if (returningMsg && returningMsg.message) {
@@ -135,6 +164,26 @@ export default function ChatScreen() {
     };
     fetchChat();
   }, [token, id]);
+
+  // Keyboard handling
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleSend = async () => {
     Keyboard.dismiss();
@@ -188,7 +237,6 @@ export default function ChatScreen() {
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const isUser = item.role === "user";
-    const time12 = formatUtcToIstTime(item.timestamp);
 
     const isAssistant = item.role === "assistant";
     const content = item.content || "";
@@ -201,7 +249,7 @@ export default function ChatScreen() {
       let adviceOrTips: string[] = [];
 
       const adviceSplitRegex = /\n+(?=For |Coach Tip:)/g;
-      const contentParts = content.split(adviceSplitRegex);
+      const contentParts = content?.split(adviceSplitRegex);
       let mainContent = contentParts[0];
       adviceOrTips = contentParts.slice(1).map((p) => p.trim());
 
@@ -210,11 +258,11 @@ export default function ChatScreen() {
 
       if (mainContent.match(messageGroupRegex)) {
         suggestionMessages = mainContent
-          .split(messageGroupRegex)
+          ?.split(messageGroupRegex)
           .filter((msg: string) => msg.trim());
         isComplexAssistantMessage = true;
       } else if (mainContent.match(numberedListRegex)) {
-        const numberedListParts = mainContent.split(numberedListRegex);
+        const numberedListParts = mainContent?.split(numberedListRegex);
         introText = numberedListParts[0].trim();
         suggestionMessages = numberedListParts
           .slice(1)
@@ -228,57 +276,61 @@ export default function ChatScreen() {
         return (
           <View className={`flex-col items-start mb-4`}>
             {introText && !!introText.trim() && (
-              <View className="max-w-[85%] self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-2">
+              <View className="w-64 self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-2">
                 {renderFormattedText(introText)}
-                <Text className="text-black text-xs mt-2 text-right">
+                {/* <Text className="text-black/15 text-xs mt-2 text-right">
                   {time12}
-                </Text>
+                </Text> */}
               </View>
             )}
-            {suggestionMessages.map((msg: string, idx: number) => {
-              const copyKey = `msg-${index}-${idx}`;
-              const isCopied = copiedStates[copyKey];
-              const trimmedMsg = msg.trim();
-              return (
-                <View
-                  key={idx}
-                  className="max-w-[85%] flex-row items-start mb-2 border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3"
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text className={`text-black text-base pr-5`}>
-                      {renderFormattedText(trimmedMsg)}
-                    </Text>
-                    <Text className="text-black text-xs mt-2 text-right">
-                      {time12}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    className="absolute right-5 top-3"
-                    onPress={() => handleCopy(trimmedMsg, copyKey)}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
+              {suggestionMessages.map((msg: string, idx: number) => {
+                const copyKey = `msg-${index}-${idx}`;
+                const isCopied = copiedStates[copyKey];
+                const trimmedMsg = msg.trim();
+                return (
+                  <View
+                    key={idx}
+                    className="w-64 flex items-center mr-5 mb-2 border bg-[#5248A0] border-white rounded-xl px-5 py-3"
                   >
-                    <MaterialIcons
-                      name={isCopied ? "check" : "content-copy"}
-                      size={18}
-                      color={isCopied ? "green" : "#60646D"}
-                    />
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+                    <View>
+                      <Text className={`text-white text-base mb-3`}>
+                        {renderFormattedText(trimmedMsg?.split("\n")[1])}
+                      </Text>
+                      {/* <Text className="text-black text-xs mt-2 text-right">
+                      {time12}
+                    </Text> */}
+                      <TouchableOpacity
+                        className="flex-row gap-2 items-center justify-center py-4 rounded-lg border-t border-gray-200"
+                        onPress={() =>
+                          handleCopy(trimmedMsg?.split("\n")[1], copyKey)
+                        }
+                      >
+                        <Feather name="copy" size={24} color="white" />
+                        <Text className="text-white font-semibold">
+                          Copy Message
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
             {adviceOrTips.map((tip: string, idx: number) => {
               const trimmedTip = tip.trim();
               return (
                 <View
                   key={`tip-${idx}`}
-                  className="w-full flex-row items-start mb-2"
+                  className="w-full flex-row items-start mb-2 ml-12"
                 >
-                  <View className="max-w-[85%] flex-row items-start border bg-[#E6F5FA] border-[#DADADA] rounded-xl px-5 py-3">
+                  <View className="w-64 flex-row items-start border bg-black/15 border-white rounded-xl px-5 py-3">
                     <View style={{ flex: 1 }}>
                       {renderFormattedText(trimmedTip)}
                     </View>
-                    <Text className="text-black text-xs mt-2 text-right">
+                    {/* <Text className="text-black text-xs mt-2 text-right">
                       {time12}
-                    </Text>
+                    </Text> */}
                   </View>
                 </View>
               );
@@ -292,11 +344,24 @@ export default function ChatScreen() {
       <View
         className={`flex-row ${isUser ? "flex-row-reverse" : "flex-row"} items-start mb-4`}
       >
+        {isUser ? (
+          <Image
+            source={
+              gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
+            }
+            className="w-9 h-9 rounded-full ml-2"
+          />
+        ) : (
+          <Image
+            source={ImageIcons.Assistant}
+            className="w-10 h-10 rounded-full mr-2"
+          />
+        )}
         <View
-          className={`max-w-[85%] border ${isUser ? "bg-white border-[#E2E2E2]" : "bg-[#F6F4FF] border-[#DADADA]"} rounded-xl px-5 py-3`}
+          className={`w-64 ${isUser ? "bg-[#C6BFFF]/10" : "bg-black/15 border border-white"} rounded-xl px-5 py-3`}
         >
-          <Text className={`text-black text-base`}>{item.content}</Text>
-          <Text className="text-black text-xs text-right">{time12}</Text>
+          <Text className={`text-white text-base`}>{item.content}</Text>
+          {/* <Text className="text-white text-xs text-right">{time12}</Text> */}
         </View>
       </View>
     );
@@ -309,10 +374,10 @@ export default function ChatScreen() {
     );
   }
   return (
-    <ImageBackground source={ImageIcons.BackgroundImage} className="flex-1">
+    <View className="flex-1 bg-[#3A327B]">
       <KeyboardLayout>
         {/* Header */}
-        <View className="flex-row items-center justify-start px-5 py-4 border-b border-[#35383E]">
+        <View className="flex-row items-center px-5 py-4">
           <TouchableOpacity
             className="mr-4"
             onPress={() =>
@@ -321,11 +386,15 @@ export default function ChatScreen() {
                 : router.replace("/(protected)/(tabs)/chats")
             }
           >
-            <MaterialIcons name="arrow-back" size={24} color="#000" />
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <View>
-            <Text className="text-black text-[22px] font-bold">
-              {note?.contact_name}
+          <View className="flex-row items-center">
+            <Image
+              source={gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon}
+              className="w-10 h-10 rounded-full mr-2"
+            />
+            <Text className="text-white text-[22px] font-bold">
+              {note?.contact_name || "Gargy Chattery"}
             </Text>
           </View>
         </View>
@@ -336,7 +405,11 @@ export default function ChatScreen() {
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(_, idx) => idx.toString()}
-            contentContainerStyle={{ paddingVertical: 26, flexGrow: 1 }}
+            contentContainerStyle={{
+              paddingVertical: 26,
+              flexGrow: 1,
+              paddingBottom: isKeyboardVisible ? 100 : 26,
+            }}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={() =>
               (flatListRef.current as any)?.scrollToEnd({ animated: true })
@@ -358,24 +431,15 @@ export default function ChatScreen() {
             </View>
           )}
         </View>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: "white",
-            borderRadius: 16,
-            marginHorizontal: 16,
-            paddingHorizontal: 12,
-          }}
-        >
+        <View className="flex-row items-center bg-white rounded-full mx-4 mb-4 px-4 py-2 shadow-sm shadow-black/20">
+          {/* Plus Icon */}
+          <TouchableOpacity className="mr-2">
+            <MaterialIcons name="add" size={22} color="#808080" />
+          </TouchableOpacity>
+
+          {/* Input Field */}
           <TextInput
-            style={{
-              flex: 1,
-              color: "black",
-              fontSize: 16,
-              height: 48,
-              backgroundColor: "white",
-            }}
+            className="flex-1 text-[#333] text-base h-10"
             placeholder="Type here..."
             placeholderTextColor="#888"
             value={message}
@@ -383,11 +447,18 @@ export default function ChatScreen() {
             onSubmitEditing={handleSend}
             returnKeyType="send"
           />
-          <TouchableOpacity onPress={handleSend} style={{ marginLeft: 8 }}>
-            <MaterialIcons name="send" size={28} color="#60646D" />
+
+          {/* Send Icon */}
+          <TouchableOpacity onPress={handleSend}>
+            <MaterialIcons name="send" size={24} color="#60646D" />
+          </TouchableOpacity>
+
+          {/* Mic Icon */}
+          <TouchableOpacity className="ml-2">
+            <MaterialIcons name="mic" size={22} color="#60646D" />
           </TouchableOpacity>
         </View>
       </KeyboardLayout>
-    </ImageBackground>
+    </View>
   );
 }

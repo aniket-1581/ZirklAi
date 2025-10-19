@@ -5,14 +5,18 @@ import LoadingMessage from '@/components/LoadingMessage';
 import TypingIndicator from '@/components/TypingIndicator';
 import { useGlobalChat } from '@/hooks/useGlobalChat';
 import { Message } from '@/types';
-import { ImageIcons } from '@/utils/ImageIcons';
-import React, { useRef, useCallback } from 'react';
-import { FlatList, ImageBackground, Text, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { FlatList, Text, View, TouchableOpacity } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
 
 export default function GlobalChatScreen() {
   const flatListRef = useRef<FlatList<Message> | null>(null);
-
+  const { autoMessage } = useLocalSearchParams<{ autoMessage?: string }>();
+  const lastSentMessage = useRef<string | null>(null);
+  const { user } = useAuth();
+  const router = useRouter();
   const {
     messages,
     userInput,
@@ -33,38 +37,57 @@ export default function GlobalChatScreen() {
     }, [loadHistory])
   );
 
-  return (
-    <ImageBackground source={ImageIcons.BackgroundImage} resizeMode="cover" style={{ flex: 1 }}>
-      <KeyboardLayout>
-        <View className="flex items-start border-b border-gray-200 p-5 bg-white/90">
-          <Text className="text-black text-2xl font-bold">Zirkl Global Chat</Text>
-        </View>
-          <View className='flex-1 mx-5 mt-4'>
-            <LoadingMessage isLoading={isLoading} message='Setting up your global chat...' />
-            <GlobalMessageList
-              messages={messages}
-              isWaitingForResponse={isWaitingForResponse}
-              onOptionSelect={handleOptionSelect}
-              flatListRef={flatListRef}
-              currentStep={''}
-            />
-            <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
+  // Handle auto-message on load (send only if it's a new message)
+  useEffect(() => {
+    if (autoMessage && !isLoading && autoMessage !== lastSentMessage.current) {
+      lastSentMessage.current = autoMessage;
+      setUserInput(autoMessage);
+      handleTextSubmit(autoMessage);
+    }
+  }, [autoMessage, isLoading, setUserInput, handleTextSubmit]);
 
-            {/* Transient loading messages while waiting for LLM */}
-            {loadingMessages.length > 0 && isWaitingForResponse && (
-              <View>
-                {loadingMessages.map((msg, idx) => (
-                  <View key={`loading-${idx}`} className="mb-2 items-start">
-                    <View className="bg-white border border-gray-200 rounded-lg px-4 py-2">
-                      <Text className="text-sm text-gray-600">{msg}</Text>
-                    </View>
+  return (
+    <View className="flex-1 bg-[#3A327B]">
+      <KeyboardLayout>
+        {/* Header */}
+        <View className="flex-row items-center justify-center px-5 mt-2">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="absolute left-5"
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text className="text-2xl font-medium text-white">Zirkl Global Chat</Text>
+        </View>
+
+        <View className='flex-1 mx-5 mt-4'>
+          <LoadingMessage isLoading={isLoading} message='Setting up your global chat...' />
+          <GlobalMessageList
+            messages={messages}
+            isWaitingForResponse={isWaitingForResponse}
+            onOptionSelect={handleOptionSelect}
+            flatListRef={flatListRef}
+            currentStep={''}
+            user={user?.full_name || ''}
+          />
+          <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
+
+          {/* Transient loading messages while waiting for LLM */}
+          {loadingMessages.length > 0 && isWaitingForResponse && (
+            <View>
+              {loadingMessages.map((msg, idx) => (
+                <View key={`loading-${idx}`} className="mb-2 items-start">
+                  <View className="bg-white border border-gray-200 rounded-lg px-4 py-2">
+                    <Text className="text-sm text-gray-600">{msg}</Text>
                   </View>
-                ))}
-              </View>
-            )}
-          </View>
-          <ChatInput userInput={userInput} setUserInput={setUserInput} onTextSubmit={() => handleTextSubmit()} isWaitingForResponse={isWaitingForResponse} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <ChatInput userInput={userInput} setUserInput={setUserInput} onTextSubmit={() => handleTextSubmit()} isWaitingForResponse={isWaitingForResponse} />
       </KeyboardLayout>
-    </ImageBackground>
+    </View>
   );
 }
