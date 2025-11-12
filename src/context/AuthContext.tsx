@@ -13,8 +13,8 @@ import Toast from 'react-native-toast-message';
 import { login as apiLogin, getUser, verifyOtp } from '@/api/auth';
 import { createCallLogs } from '@/api/call-logs';
 import { registerAndSendFcmToken } from '@/api/notifications';
-import { getOnboardingStatus, OnboardingStatusResponse } from '@/api/onboarding';
 import CallLogService from '@/utils/CallLogService';
+import { getProfileStatus, ProfileStatusResponse } from '@/api/profile';
 
 interface User {
   id: string;
@@ -24,6 +24,8 @@ interface User {
   company?: string;
   location: string;
   goal?: string;
+  businessCardQRCode?: string;
+  email?: string;
   [key: string]: any;
 }
 
@@ -33,7 +35,7 @@ interface AuthContextData {
   isLoading: boolean;
   ready: boolean;
   user: User | null;
-  profileSetupStatus: OnboardingStatusResponse | null;
+  profileSetupStatus: ProfileStatusResponse | null;
   completionStatusLoading: boolean;
   login: (phoneNumber: string) => Promise<{ success: boolean; message?: string }>;
   loginWithOtp: (phoneNumber: string, otp: string) => Promise<{ success: boolean; error?: string }>;
@@ -47,7 +49,7 @@ const AuthContext = createContext<AuthContextData | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profileSetupStatus, setProfileSetupStatus] = useState<OnboardingStatusResponse | null>(null);
+  const [profileSetupStatus, setProfileSetupStatus] = useState<ProfileStatusResponse | null>(null);
   const [completionStatusLoading, setCompletionStatusLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [ready, setReady] = useState(false);
@@ -95,14 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!token) return;
     try {
       setCompletionStatusLoading(true);
-      console.log('Fetching onboarding status...');
-      const res = await getOnboardingStatus(token);
-      console.log('Onboarding status response:', res);
+      const res = await getProfileStatus(token);
       setProfileSetupStatus(res);
     } catch (err: any) {
       console.error('getProfileSetupStatus error:', err);
-      // Set a default status to prevent infinite loading
-      setProfileSetupStatus({ completed: false, current_step: 'welcome', total_steps: 10 });
     } finally {
       setCompletionStatusLoading(false);
     }
@@ -112,7 +110,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if(!token) return;
     try {
       const res = await registerAndSendFcmToken(token);
-      console.log(res);
     } catch (err: any) {
       console.log('Error while getting fcm token', err);
     } finally {
@@ -121,19 +118,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token])
 
   const syncCallLogsToServer = useCallback(async () => {
+    console.log('Syncing call logs to server...');
     if (!token) return;
   
     const callLogService = CallLogService.getInstance();
-    
     try {
       const hasPermission = await callLogService.checkPermission();
       if (!hasPermission) {
-        console.log('Call log permission not granted. Skipping sync.');
-        return;
+        const permissionGranted = await callLogService.requestCallLogPermission();
+        if (!permissionGranted) {
+          console.log('Call log permission not granted. Cannot sync call logs.');
+          return;
+        }
       }
 
       const result = await callLogService.getCallLogs(100);
-      if (result.success && result.data) {
+
+      if (result.success && result.data && result.data.length > 0) {
+        console.log(`Found ${result.data.length} call logs to sync.`)
         const logsToSave = result.data
           .map(log => ({
             dateTime: log.dateTime,
@@ -145,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
   
         if (logsToSave.length > 0) {
-          await createCallLogs(logsToSave);
+          await createCallLogs(logsToSave, token);
           console.log('Call logs synced successfully.');
         } else {
           console.log('No call logs to sync.');

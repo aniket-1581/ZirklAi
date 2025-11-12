@@ -1,12 +1,10 @@
-import { getNotes, createNote } from '@/api/notes';
+import { createNote, getNotes } from '@/api/notes';
 import { getPhoneContacts } from '@/api/profile';
-import PlanCard from '@/components/home/PlanCard';
-import NewChatModal from '@/components/MobileNewChatModal';
+import PlanCard from '@/components/PlanCard';
 import { useAuth } from '@/context/AuthContext';
-import { AntDesign } from '@expo/vector-icons';
-import { useFocusEffect, router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { FlatList, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface Contact {
     id: string;
@@ -23,8 +21,9 @@ export default function ChatsScreen() {
   const [notesContacts, setNotesContacts] = useState<any[]>([]);
   const [phoneContacts, setPhoneContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isModalVisible, setIsModalVisible] = useState(false);
   const [activeSection, setActiveSection] = useState<'inNetwork' | 'outsideNetwork'>('inNetwork');
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -46,6 +45,7 @@ export default function ChatsScreen() {
       );
 
       setPhoneContacts(filteredPhoneContacts);
+      setFilteredContacts(filteredPhoneContacts);
     } catch (e: any) {
       console.error('Failed to fetch data', e);
       setNotesContacts([]);
@@ -66,7 +66,6 @@ export default function ChatsScreen() {
   };
 
   const handleSelectContact = async (contact: Contact) => {
-    console.log(contact);
     try {
       setLoading(true);
       const contactData = {
@@ -84,6 +83,14 @@ export default function ChatsScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    const filtered = phoneContacts.filter((c) =>
+      c.name.toLowerCase().includes(text.toLowerCase())
+    );
+    setFilteredContacts(filtered);
   };
 
   if (loading) {
@@ -144,11 +151,21 @@ export default function ChatsScreen() {
             <View className='flex-row items-center justify-start mb-4'>
               <Text className='text-white/70 font-medium text-lg'>My Contacts</Text>
             </View>
+            {/* Search Input */}
+            <View>
+              <TextInput
+                className="border border-white/15 px-3 py-3 rounded-lg mb-3 text-white/70"
+                placeholder="Search contacts..."
+                placeholderTextColor="white"
+                value={searchQuery}
+                onChangeText={handleSearch}
+              />
+            </View>
             <FlatList
-              data={phoneContacts}
+              data={filteredContacts}
               keyExtractor={(item, index) => `${item.phoneNumber}-${index}`}
               renderItem={({ item, index }) => (
-                <TouchableOpacity className='bg-black/15 rounded-xl p-4 mb-3'>
+                <TouchableOpacity className='bg-black/15 rounded-xl p-4 mb-3 border border-white/15'>
                   <View className='flex-row items-center'>
                     <View className='w-12 h-12 bg-white/20 rounded-full mr-4 items-center justify-center'>
                       <Text className='text-white font-semibold text-lg'>{item.name?.charAt(0) || '?'}</Text>
@@ -170,19 +187,6 @@ export default function ChatsScreen() {
             />
           </View>
         )}
-
-        <TouchableOpacity
-          className="absolute bottom-6 right-6 bg-[#5C57A5] w-14 h-14 rounded-full items-center justify-center shadow-lg z-10"
-          onPress={() => setIsModalVisible(true)}
-        >
-          <AntDesign name='plus' color="white" size={24} />
-        </TouchableOpacity>
-
-        {/* Modal */}
-        <NewChatModal
-          visible={isModalVisible}
-          onClose={() => setIsModalVisible(false)}
-        />
       </View>
   );
 }

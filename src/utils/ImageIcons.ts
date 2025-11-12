@@ -22,4 +22,8 @@ export const ImageIcons = {
     ConnectCalendar: require('@/assets/images/home/connect-calendar.png'),
     ThankYou: require('@/assets/images/home/thank-you.png'),
     Assistant: require('@/assets/images/assistant.png'),
+    networkingStep3: require('@/assets/images/networkingScreen.png'),
+    networkingStep4: require('@/assets/images/networkingScreen2.png'),
+    networkingStep5: require('@/assets/images/networkingScreen3.png'),
+    CelebrationEmoji: require('@/assets/images/confettiHero.png'),
 }

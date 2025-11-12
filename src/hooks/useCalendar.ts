@@ -30,8 +30,7 @@ export function useCalendar() {
       const fetched = await Calendar.getEventsAsync([defaultCalendarId], start, end);
 
       // Filter events to only include those with title "[Zirkl Ai]"
-      const zirklAiEvents = fetched.filter(event => event.title.startsWith("[Zirkl Ai]"));
-      console.log("Zirkl Ai Events", zirklAiEvents);
+      const zirklAiEvents = fetched.filter(event => event.title.startsWith("[Zirkl Ai]") || event.title.startsWith("Follow Up"));
 
       setEvents(zirklAiEvents);
     } catch (err) {
@@ -94,7 +93,6 @@ export function useCalendar() {
     }
     
     try {
-      console.log("Syncing events to backend", eventsToSync);
       const eventsForBackend: CalendarEventSyncRequest = {
         device_events: eventsToSync.map(event => {
           return {

@@ -16,7 +16,6 @@ export async function registerAndSendFcmToken(token: string) {
   const fcmToken =
     (devicePush as any)?.data ??
     (devicePush as unknown as { data?: string })?.data;
-  console.log("fcmToken", fcmToken);
   if (!fcmToken) return null;
 
   try {

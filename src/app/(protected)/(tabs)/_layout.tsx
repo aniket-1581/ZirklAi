@@ -1,7 +1,6 @@
 import CrystalSphereButton from '@/components/CrystalSphereButton';
 import { FontAwesome, Fontisto, MaterialIcons, Octicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { router } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { View } from 'react-native';
 
 
@@ -9,7 +8,7 @@ export default function TabsLayout() {
     return (
         <Tabs
             screenOptions={({ route }) => {
-                const hiddenRoute = route.name === 'chats/[id]/index' || route.name === 'global-chat/index';
+                const hiddenRoute = route.name === 'chats/[id]/index' || route.name === 'global-chat/index' || route.name === 'journal/index';
                 return {
                     headerShown: false,
                     tabBarStyle: hiddenRoute ? { display: 'none' } : {
@@ -99,6 +98,30 @@ export default function TabsLayout() {
             />
             <Tabs.Screen
                 name="notifications/index"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="scanner/index"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="scanner/Overlay"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="ocr-scanner/index"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="networking-playbook/[id]/index"
                 options={{
                     href: null,
                 }}

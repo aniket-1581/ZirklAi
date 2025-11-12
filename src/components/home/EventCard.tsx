@@ -1,21 +1,35 @@
 import React, { useState } from "react";
 import { ImageIcons } from "@/utils/ImageIcons";
 import { formatUtcToIstTime } from "@/utils/date";
-import { TouchableOpacity, View, Text, Image, ScrollView, Modal } from "react-native";
-import { getGender } from 'gender-detection-from-name';
-import * as Clipboard from 'expo-clipboard';
+import {
+  TouchableOpacity,
+  View,
+  Text,
+  Image,
+  ScrollView,
+  Modal,
+  Share,
+} from "react-native";
+import { getGender } from "gender-detection-from-name";
+import * as Clipboard from "expo-clipboard";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 
 interface EventCardProps {
   items: any[];
-  type: 'calendar' | 'followup';
+  type: "combined";
   renderItem?: (item: any, index: number) => React.ReactNode;
   emptyMessage?: string;
   handleDeleteNudge?: (nudgeId: string) => Promise<void>;
 }
 
-export default function EventCard({ items, type, renderItem, emptyMessage = "No items available", handleDeleteNudge }: EventCardProps) {
+export default function EventCard({
+  items,
+  type,
+  renderItem,
+  emptyMessage = "No items available",
+  handleDeleteNudge,
+}: EventCardProps) {
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
@@ -32,72 +46,15 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
   };
 
   const defaultRenderItem = (item: any, index: number) => {
-    if (type === 'calendar') {
-      const femaleUserIcon = [
-        ImageIcons.GirlImage,
-        ImageIcons.GirlImage2,
-        ImageIcons.GirlImage3,
-        ImageIcons.GirlImage4,
-      ];
-      const maleUserIcon = [
-        ImageIcons.BoyImage,
-        ImageIcons.BoyImage2,
-        ImageIcons.BoyImage3,
-      ];
-      const firstName = item.title.split("for ")[1].split(" ")[0];
-      const cardImage = [ImageIcons.Calendar, ImageIcons.Calendar2];
-      const randomFemaleUserIcon = femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)];
-      const randomMaleUserIcon = maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
-      const randomCardImage = cardImage[Math.floor(Math.random() * cardImage.length)];
-      const startDate = new Date(item.startDate);
-      const today = new Date();
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dayOfWeek = daysOfWeek[startDate.getDay()];
-
-      const gender = getGender(firstName, 'en');
-
-      return (
-        <TouchableOpacity
-          key={index}
-          onPress={() => {
-            setSelectedItem(item);
-            setPopupVisible(true);
-          }}
-          className="items-center mr-5"
-        >
-          <View className="flex gap-3 items-start">
-            <Image source={randomCardImage} className="w-[230px] h-[149px] rounded-xl" />
-            <View className="flex flex-row gap-2 items-center">
-              <View className={`w-10 h-10 items-center justify-center`}>
-                <Image
-                  source={
-                    gender === "male"
-                      ? randomMaleUserIcon
-                      : randomFemaleUserIcon
-                  }
-                  className="w-10 h-10 rounded-full"
-                />
-              </View>
-              <View className="flex flex-col">
-                <Text className="text-sm font-medium text-start text-white">
-                  {item.title.split("for ")[1] || "Unknown"}
-                </Text>
-                <Text className="text-[10px] text-start text-white">
-                  {startDate.toDateString() === today.toDateString()
-                    ? `Today ${formatUtcToIstTime(item.startDate)}`
-                    : startDate.toDateString() === tomorrow.toDateString()
-                      ? `Tomorrow ${formatUtcToIstTime(item.startDate)}`
-                      : `${dayOfWeek} ${formatUtcToIstTime(item.startDate)}`}
-                  , 1:1 Discussion
-                </Text>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
+    if (type === "combined") {
+      const itemType = item.type;
+      const gender = getGender(
+        itemType === "followup"
+          ? item.title.split("for ")[1]?.split(" ")[0] || ""
+          : item.contact_name?.split(" ")[0] || "",
+        "en"
       );
-    } else if (type === 'followup') {
+
       const femaleUserIcon = [
         ImageIcons.GirlImage,
         ImageIcons.GirlImage2,
@@ -108,12 +65,30 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
         ImageIcons.BoyImage,
         ImageIcons.BoyImage2,
         ImageIcons.BoyImage3,
-      ];    
-      const cardImage = [ImageIcons.FollowUp, ImageIcons.FollowUp2];
-      const randomFemaleUserIcon = femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)];
-      const randomMaleUserIcon = maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
-      const randomCardImage = cardImage[Math.floor(Math.random() * cardImage.length)];
-      const gender = getGender(item.contact_name.split(" ")[0], 'en');
+      ];
+      const randomFemaleUserIcon =
+        femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)];
+      const randomMaleUserIcon =
+        maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
+
+      const randomCardImage =
+        itemType === "followup"
+          ? [ImageIcons.Calendar, ImageIcons.Calendar2][
+              Math.floor(Math.random() * 2)
+            ]
+          : [ImageIcons.FollowUp, ImageIcons.FollowUp2][
+              Math.floor(Math.random() * 2)
+            ];
+
+      const displayName =
+        itemType === "followup"
+          ? item.title.split("for ")[1] || "Unknown"
+          : item.contact_name || "Unknown";
+
+      const message =
+        itemType === "followup"
+          ? `${new Date(item.startDate).toDateString()} ${formatUtcToIstTime(item.startDate)}`
+          : item.message?.slice(0, 40) || "No message";
 
       return (
         <TouchableOpacity
@@ -125,17 +100,23 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
           className="items-center mr-5"
         >
           <View className="flex gap-3 items-start">
-            <Image source={randomCardImage} className="w-[230px] h-[149px] rounded-xl" />
+            <Image
+              source={randomCardImage}
+              className="w-[230px] h-[149px] rounded-xl"
+            />
             <View className="flex flex-row gap-2 items-center">
-              <View className={`w-10 h-10 items-center justify-center`}>
-                <Image source={gender === 'male' ? randomMaleUserIcon : randomFemaleUserIcon} className="w-10 h-10 rounded-full" />
-              </View>
+              <Image
+                source={
+                  gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
+                }
+                className="w-10 h-10 rounded-full"
+              />
               <View className="flex flex-col">
                 <Text className="text-sm font-medium text-start text-white">
-                  {item.contact_name || 'Unknown'}
+                  {displayName}
                 </Text>
                 <Text className="text-[10px] text-start text-white">
-                  {item.message?.slice(0, 30) || 'No message'}
+                  {message}
                 </Text>
               </View>
             </View>
@@ -147,6 +128,7 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
     return null;
   };
 
+
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -155,11 +137,14 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
             <Text className="text-gray-600">{emptyMessage}</Text>
           </View>
         ) : (
-          items.map((item, index) => renderItem ? renderItem(item, index) : defaultRenderItem(item, index))
+          items.map((item, index) =>
+            renderItem
+              ? renderItem(item, index)
+              : defaultRenderItem(item, index)
+          )
         )}
       </ScrollView>
 
-      {/* Popup Modal */}
       <Modal
         visible={popupVisible}
         transparent={true}
@@ -167,64 +152,216 @@ export default function EventCard({ items, type, renderItem, emptyMessage = "No 
         onRequestClose={() => setPopupVisible(false)}
       >
         <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-[#5248A0] m-5 rounded-2xl p-6 w-96">
-            <TouchableOpacity className="absolute top-6 right-6 z-50" onPress={() => setPopupVisible(false)}>
+          <View className="bg-[#5248A0] m-5 rounded-2xl p-6 w-96 relative">
+            {/* Close button */}
+            <TouchableOpacity
+              className="absolute top-6 right-6 z-50"
+              onPress={() => setPopupVisible(false)}
+            >
               <Feather name="x" size={24} color="white" />
             </TouchableOpacity>
-            <Text className="text-lg font-bold text-white mb-4">Message</Text>
 
-            {selectedItem && type === 'calendar' && (
-              <View className="mb-4">
-                <Text className="text-white mb-2">
-                  <Text className="font-semibold">Title:</Text> {selectedItem.title}
-                </Text>
-                <Text className="text-white mb-2">
-                  <Text className="font-semibold">Date:</Text> {new Date(selectedItem.startDate).toLocaleDateString()}
-                </Text>
-                <Text className="text-white mb-2">
-                  <Text className="font-semibold">Time:</Text> {formatUtcToIstTime(selectedItem.startDate)}
-                </Text>
-                {selectedItem.notes && (
-                  <Text className="text-white">
-                    <Text className="font-semibold">Notes:</Text> {selectedItem.notes}
+            {selectedItem?.type === "followup" ? (
+              selectedItem.title.startsWith("Follow Up") ? (
+                <Text className="text-lg font-bold text-white mb-4">Micro-journal Action</Text>
+              ) : (
+                <Text className="text-lg font-bold text-white mb-4">Follow Up</Text>
+              )
+            ) : (
+              selectedItem?.state_name === 'StayConnectedNudgeState' ? (
+                <Text className="text-lg font-bold text-white mb-4">Stay Connected</Text>
+              ) : (
+                <Text className="text-lg font-bold text-white mb-4">Message</Text>
+              )
+            )}
+
+            {/* FOLLOWUP TYPE */}
+            {selectedItem && selectedItem.type === "followup" && (
+              <ScrollView className="max-h-[70vh]">
+                <View className="mb-4">
+                  <Text className="text-white mb-2">
+                    <Text className="font-semibold">Title:</Text>{" "}
+                    {selectedItem.title.split("[Zirkl Ai]")[1] ||
+                      selectedItem.title}
                   </Text>
-                )}
-              </View>
+                  <Text className="text-white mb-2">
+                    <Text className="font-semibold">Date:</Text>{" "}
+                    {new Date(selectedItem.startDate).toLocaleDateString()}
+                  </Text>
+                  <Text className="text-white mb-4">
+                    <Text className="font-semibold">Time:</Text>{" "}
+                    {formatUtcToIstTime(selectedItem.startDate)}
+                  </Text>
+
+                  {/* 🟣 Detect and render messages dynamically */}
+                  {selectedItem.notes &&
+                    (() => {
+                      const notes = selectedItem.notes.trim();
+                      // Extract Coach Tip and remove it from main notes text
+                      const coachTipMatch = notes.match(/Coach Tip:\s*([\s\S]*)/i);
+                      const coachTip = coachTipMatch ? coachTipMatch[1].trim() : null;
+                      const mainNotes = coachTipMatch
+                        ? notes.replace(coachTipMatch[0], "").trim()
+                        : notes;
+                      // Detect "Message 1:", "Message 2:", etc.
+                      const messageMatches = mainNotes.match(/Message\s\d+:/g);
+
+                      // CASE 1️⃣: Multiple messages
+                      if (messageMatches && messageMatches.length > 0) {
+                        const messages = mainNotes
+                          .split(/Message\s\d+:/)
+                          .slice(1)
+                          .map((msg: string) => msg.trim());
+
+                        return (
+                          <>
+                            {messages.map((msg: string, idx: number) => (
+                              <View
+                                key={idx}
+                                className="bg-[#655BC5] rounded-xl p-4 mb-3"
+                              >
+                                <View className="flex-row justify-between items-start">
+                                  <Text className="text-white text-sm flex-1">
+                                    <Text className="font-semibold">
+                                      Message {idx + 1}:
+                                    </Text>{" "}
+                                    {msg}
+                                  </Text>
+                                  <View className="flex-row ml-2">
+                                    {/* Copy */}
+                                    <TouchableOpacity
+                                      onPress={async () => {
+                                        await Clipboard.setStringAsync(msg);
+                                      }}
+                                      className="mr-3"
+                                    >
+                                      <Feather
+                                        name="copy"
+                                        size={18}
+                                        color="white"
+                                      />
+                                    </TouchableOpacity>
+                                    {/* Share */}
+                                    <TouchableOpacity
+                                      onPress={async () => {
+                                        const shareText = msg;
+                                        await Share.share({
+                                          message: shareText,
+                                        });
+                                      }}
+                                    >
+                                      <Feather
+                                        name="share-2"
+                                        size={18}
+                                        color="white"
+                                      />
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              </View>
+                            ))}
+
+                            {coachTip && (
+                              <View className="mt-3 border-t border-white/20 pt-3">
+                                <Text className="text-white text-sm">
+                                  <Text className="font-semibold">
+                                    Coach Tip:
+                                  </Text>{" "}
+                                  {coachTip}
+                                </Text>
+                              </View>
+                            )}
+                          </>
+                        );
+                      }
+
+                      // CASE 2️⃣: Single note (no "Message X" markers)
+                      return (
+                        <View className="bg-[#655BC5] rounded-xl p-4">
+                          <View className="flex-row justify-between items-start">
+                            <Text className="text-white text-sm flex-1">
+                              {notes}
+                            </Text>
+                            {!selectedItem.title.startsWith("Follow Up") && (
+                              <View className="flex-row ml-2">
+                                <TouchableOpacity
+                                  onPress={async () => {
+                                    await Clipboard.setStringAsync(notes);
+                                  }}
+                                  className="mr-3"
+                                >
+                                  <Feather name="copy" size={18} color="white" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  onPress={async () => {
+                                    const shareText = `${selectedItem.title}\n${new Date(
+                                      selectedItem.startDate
+                                    ).toLocaleDateString()} ${formatUtcToIstTime(
+                                      selectedItem.startDate
+                                    )}\n${notes}`;
+                                    await Share.share({ message: shareText });
+                                  }}
+                                >
+                                  <Feather
+                                    name="share-2"
+                                    size={18}
+                                    color="white"
+                                  />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })()}
+                </View>
+              </ScrollView>
             )}
 
-            {selectedItem && type === 'followup' && (
+            {/* NUDGE TYPE */}
+            {selectedItem && selectedItem.type === "nudge" && (
               <View className="mb-4">
                 <Text className="text-white mb-2">
-                  <Text className="font-semibold">Contact:</Text> {selectedItem.contact_name}
+                  <Text className="font-semibold">Contact:</Text>{" "}
+                  {selectedItem.contact_name}
                 </Text>
-                <Text className="text-white">
-                  <Text className="font-semibold">Message:</Text> {selectedItem.message}
-                </Text>
+
+                <View className="bg-[#655BC5] rounded-xl p-4">
+                  <View className="flex-row justify-between items-start">
+                    <Text className="text-white text-sm flex-1">
+                      {selectedItem.message}
+                    </Text>
+
+                    <View className="flex-row ml-2">
+                      <TouchableOpacity
+                        onPress={async () => {
+                          await Clipboard.setStringAsync(selectedItem.message);
+                        }}
+                        className="mr-3"
+                      >
+                        <Feather name="copy" size={18} color="white" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          await Share.share({ message: selectedItem.message });
+                        }}
+                      >
+                        <Feather name="share-2" size={18} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
               </View>
             )}
 
-            <TouchableOpacity
-              className="flex-row gap-2 items-center justify-center py-4 rounded-lg border-t border-gray-200"
-              onPress={async () => {
-                if (selectedItem) {
-                  const textToCopy = type === 'calendar'
-                    ? `${selectedItem.title}\n${new Date(selectedItem.startDate).toLocaleDateString()} ${formatUtcToIstTime(selectedItem.startDate)}\n${selectedItem.notes || ''}`
-                    : `${selectedItem.contact_name}: ${selectedItem.message}`;
-
-                  await Clipboard.setStringAsync(textToCopy);
-                  // You could add a toast notification here
-                }
-              }}
-            >
-              <Feather name="copy" size={24} color="white" />
-              <Text className="text-white font-semibold">Copy Message</Text>
-            </TouchableOpacity>
-            {type === 'followup' && (
+            {/* Delete button (for nudges only) */}
+            {selectedItem?.type === "nudge" && (
               <TouchableOpacity
-                className="flex-row gap-2 items-center justify-center pt-4 rounded-lg border-t border-gray-200"
+                className="flex-row gap-2 items-center justify-center pt-4 border-t border-gray-300 mt-4"
                 onPress={() => handleDelete(selectedItem._id)}
               >
-                <MaterialIcons name="delete" size={24} color="red" />
+                <MaterialIcons name="delete" size={22} color="red" />
                 <Text className="text-red-500 font-semibold">Delete</Text>
               </TouchableOpacity>
             )}

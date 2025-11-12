@@ -57,13 +57,12 @@ class CallLogService {
       const result = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
         {
-          title: 'Call Log Permission',
-          message: 'This app needs access to your call log to provide enhanced features.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
+          title: 'Call log permission',
+          message: 'This app needs access to your call log to manage events.',
           buttonPositive: 'OK',
+          buttonNegative: 'Cancel',
         }
-      );
+      )
 
       this.permissionGranted = result === PermissionsAndroid.RESULTS.GRANTED;
       

@@ -78,7 +78,7 @@ const NewChatModal: React.FC<NewChatModalProps> = ({ visible, onClose }) => {
         setLoading(true);
         onClose();
         delay(4000);
-        router.push(`/(protected)/(tabs)/chats/${newNote.id}`);
+        router.push(`/(protected)/(tabs)/chats/${newNote[0].id}`);
     } catch (err) {
       console.error('Failed to start chat:', err);
     } finally {

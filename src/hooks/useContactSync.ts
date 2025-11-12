@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
+import * as Contacts from 'expo-contacts';
 import ContactSyncService, { Contact, ContactSyncResult } from '@/utils/ContactSyncService';
 
 export interface UseContactSyncReturn {
@@ -24,9 +26,30 @@ export function useContactSync(): UseContactSyncReturn {
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
 
-  // Load initial data
+  // Load initial data and set up contact change listener
   useEffect(() => {
-    loadInitialData();
+    let subscription: { remove: () => void } | null = null;
+
+    const setup = async () => {
+      await loadInitialData();
+      
+      // Set up contact change listener for real-time updates
+      if (Platform.OS === 'ios') {
+        subscription = Contacts.addContactsChangeListener(async () => {
+          console.log('Contacts changed, refreshing...');
+          await refreshContacts();
+        });
+      }
+    };
+
+    setup();
+
+    // Clean up the subscription when the component unmounts
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
   }, []);
 
   const loadInitialData = useCallback(async () => {

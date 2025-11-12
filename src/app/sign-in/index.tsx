@@ -11,7 +11,6 @@ import {
   View,
   StyleSheet,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import KeyboardLayout from "@/components/KeyboardAvoidingLayout";
 

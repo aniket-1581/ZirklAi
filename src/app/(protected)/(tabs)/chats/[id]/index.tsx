@@ -60,16 +60,16 @@ export default function ChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const router = useRouter();
 
-  const randomFemaleUserIcon = useMemo(() =>
-    femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)],
+  const randomFemaleUserIcon = useMemo(
+    () => femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)],
     []
   );
-  const randomMaleUserIcon = useMemo(() =>
-    maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)],
+  const randomMaleUserIcon = useMemo(
+    () => maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)],
     []
   );
-  const gender = useMemo(() =>
-    getGender(note?.contact_name?.split(" ")[0], "en"),
+  const gender = useMemo(
+    () => getGender(note?.contact_name?.split(" ")[0], "en"),
     [note?.contact_name]
   );
 
@@ -85,7 +85,7 @@ export default function ChatScreen() {
     const parts = text?.split(/(\*.*?\*)/g);
     return (
       <Text className="text-white text-base">
-        {parts.map((part, index) => {
+        {parts?.map((part, index) => {
           if (part.startsWith("*") && part.endsWith("*")) {
             return (
               <Text key={index} className="font-bold">
@@ -235,6 +235,13 @@ export default function ChatScreen() {
     }
   };
 
+
+  useEffect(() => {
+    if (draftMessage !== "") {
+      handleSend()
+    }
+  }, [draftMessage])
+
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const isUser = item.role === "user";
 
@@ -274,67 +281,72 @@ export default function ChatScreen() {
 
       if (isComplexAssistantMessage || adviceOrTips.length > 0) {
         return (
-          <View className={`flex-col items-start mb-4`}>
-            {introText && !!introText.trim() && (
-              <View className="w-64 self-start border bg-[#F6F4FF] border-[#DADADA] rounded-xl px-5 py-3 mb-2">
-                {renderFormattedText(introText)}
-                {/* <Text className="text-black/15 text-xs mt-2 text-right">
+          <View className={`flex-row items-start mb-4`}>
+            <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
+            <View className="flex-col items-start mb-4">
+              {introText && !!introText.trim() && (
+                <View className="w-80 flex-row items-center mr-4 mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4">
+                  {renderFormattedText(introText)}
+                  {/* <Text className="text-black/15 text-xs mt-2 text-right">
                   {time12}
                 </Text> */}
-              </View>
-            )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
-              {suggestionMessages.map((msg: string, idx: number) => {
-                const copyKey = `msg-${index}-${idx}`;
-                const isCopied = copiedStates[copyKey];
-                const trimmedMsg = msg.trim();
+                </View>
+              )}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {suggestionMessages.map((msg: string, idx: number) => {
+                  const copyKey = `msg-${index}-${idx}`;
+                  const isCopied = copiedStates[copyKey];
+                  const trimmedMsg = msg.trim();
+                  return (
+                    <View
+                      key={idx}
+                      className="w-80 flex-row items-start mr-4 mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4"
+                    >
+                      <View>
+                        <Text className={`text-white text-base mb-3`}>
+                          {renderFormattedText(trimmedMsg)}
+                        </Text>
+                        {/* <Text className="text-black text-xs mt-2 text-right">
+                      {time12}
+                    </Text> */}
+                        {(trimmedMsg.includes("Message 1:") ||
+                          trimmedMsg.includes("Message 2:") ||
+                          trimmedMsg.includes("Message 3:")) && (
+                          <TouchableOpacity
+                            className="absolute right-2 top-2"
+                            onPress={() => handleCopy(trimmedMsg, copyKey)}
+                          >
+                            <MaterialIcons
+                              name={isCopied ? "check" : "content-copy"}
+                              size={18}
+                              color={isCopied ? "#10B981" : "#9CA3AF"}
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+              {adviceOrTips.map((tip: string, idx: number) => {
+                const trimmedTip = tip.trim();
                 return (
                   <View
-                    key={idx}
-                    className="w-64 flex items-center mr-5 mb-2 border bg-[#5248A0] border-white rounded-xl px-5 py-3"
+                    key={`tip-${idx}`}
+                    className="w-full flex-row items-start mb-2 ml-12"
                   >
-                    <View>
-                      <Text className={`text-white text-base mb-3`}>
-                        {renderFormattedText(trimmedMsg?.split("\n")[1])}
-                      </Text>
+                    <View className="w-80 flex-row items-start border bg-black/15 border-white rounded-xl px-5 py-3">
+                      <View style={{ flex: 1 }}>
+                        {renderFormattedText(trimmedTip)}
+                      </View>
                       {/* <Text className="text-black text-xs mt-2 text-right">
                       {time12}
                     </Text> */}
-                      <TouchableOpacity
-                        className="flex-row gap-2 items-center justify-center py-4 rounded-lg border-t border-gray-200"
-                        onPress={() =>
-                          handleCopy(trimmedMsg?.split("\n")[1], copyKey)
-                        }
-                      >
-                        <Feather name="copy" size={24} color="white" />
-                        <Text className="text-white font-semibold">
-                          Copy Message
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 );
               })}
-            </ScrollView>
-            {adviceOrTips.map((tip: string, idx: number) => {
-              const trimmedTip = tip.trim();
-              return (
-                <View
-                  key={`tip-${idx}`}
-                  className="w-full flex-row items-start mb-2 ml-12"
-                >
-                  <View className="w-64 flex-row items-start border bg-black/15 border-white rounded-xl px-5 py-3">
-                    <View style={{ flex: 1 }}>
-                      {renderFormattedText(trimmedTip)}
-                    </View>
-                    {/* <Text className="text-black text-xs mt-2 text-right">
-                      {time12}
-                    </Text> */}
-                  </View>
-                </View>
-              );
-            })}
+            </View>
           </View>
         );
       }
@@ -358,7 +370,7 @@ export default function ChatScreen() {
           />
         )}
         <View
-          className={`w-64 ${isUser ? "bg-[#C6BFFF]/10" : "bg-black/15 border border-white"} rounded-xl px-5 py-3`}
+          className={`w-80 ${isUser ? "bg-[#C6BFFF]/10" : "bg-black/15 border border-white"} rounded-xl px-5 py-3`}
         >
           <Text className={`text-white text-base`}>{item.content}</Text>
           {/* <Text className="text-white text-xs text-right">{time12}</Text> */}
@@ -390,7 +402,9 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <View className="flex-row items-center">
             <Image
-              source={gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon}
+              source={
+                gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
+              }
               className="w-10 h-10 rounded-full mr-2"
             />
             <Text className="text-white text-[22px] font-bold">

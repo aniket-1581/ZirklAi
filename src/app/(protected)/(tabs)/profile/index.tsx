@@ -18,6 +18,7 @@ import { ImageIcons } from "@/utils/ImageIcons";
 import { getNotes } from "@/api/notes";
 import { router, useFocusEffect } from "expo-router";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import BusinessCard from "@/components/BusinessCard";
 
 const COLORS = {
   white: "#FFFFFF",
@@ -33,12 +34,13 @@ const COLORS = {
 };
 
 export default function ProfileScreen() {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, getUserDetails } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState(user?.full_name || "Emily Posa");
   const [ageGroup, setAgeGroup] = useState(user?.age_group || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [location, setLocation] = useState(user?.location || "");
   const [profession, setProfession] = useState(user?.profession || "");
   const [company, setCompany] = useState(user?.company || "");
@@ -60,14 +62,19 @@ export default function ProfileScreen() {
 
     setSaving(true);
     try {
-      const profileData = { full_name: name, age_group: ageGroup, location, profession, company };
+      const profileData = { full_name: name, age_group: ageGroup, location, profession, company, email };
       await updateProfile(token, profileData);
       Toast.show({
         type: "success",
         text1: "Profile Updated",
         text2: "Your profile has been updated successfully.",
       });
-      setEditing(false);
+      try {
+        await getUserDetails();
+        setEditing(false);
+      } catch (error) {
+        console.error('Failed to fetch user details', error);
+      }
     } catch (error) {
       Toast.show({
         type: "error",
@@ -166,9 +173,19 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
+            <BusinessCard
+              name={name}
+              company={company}
+              designation={profession}
+              email={user?.email || ""}
+              mobile={user?.phone_number || ""}
+              address={user?.location || ""}
+              qrBase64={user?.businessCardQRCode || ""}
+            />
+
             {/* Stats */}
             <View
-              className="flex-row justify-between mt-4 gap-5 bg-black/15 p-5 rounded-xl"
+              className="flex-row w-full justify-between mt-4 gap-5 bg-black/15 p-5 rounded-xl"
             >
               <StatBlock label="Active Network" value={contacts.length} />
               <StatBlock label="Phonebook" value={phoneContacts?.count || 0} />
@@ -182,7 +199,7 @@ export default function ProfileScreen() {
                 borderRadius: 16,
                 paddingVertical: 30,
                 alignItems: "center",
-                marginTop: 30,
+                marginTop: 16,
                 width: "100%",
               }}
             >
@@ -215,7 +232,7 @@ export default function ProfileScreen() {
             </View>
 
             {/* Connect Button */}
-              <TouchableOpacity className="w-full bg-black/15 flex-row gap-2 items-center justify-center rounded-xl py-3 px-5 mt-4" onPress={() => router.push('/(protected)/(tabs)/chats')}>
+              <TouchableOpacity className="w-full bg-black/15 flex-row gap-2 items-center justify-center rounded-xl py-3 px-5 mt-5" onPress={() => router.push('/(protected)/(tabs)/chats')}>
                 <Ionicons name="cube" size={24} color="#DAAB35" />
                 <Text className="text-white font-medium">
                   Connect with one new person today
@@ -249,6 +266,7 @@ export default function ProfileScreen() {
                 <FormInput label="Location" value={location} setValue={setLocation} />
                 <FormInput label="Profession" value={profession} setValue={setProfession} />
                 <FormInput label="Company" value={company} setValue={setCompany} />
+                <FormInput label="Email" value={email} setValue={setEmail} />
 
                 <TouchableOpacity
                   style={{

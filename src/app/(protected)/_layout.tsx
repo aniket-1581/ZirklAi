@@ -5,13 +5,26 @@ import { useAuth } from '@/context/AuthContext';
 export default function ProtectedLayout() {
     const { isAuthenticated, profileSetupStatus } = useAuth();
     const router = useRouter();
-    console.log(profileSetupStatus)
     useEffect(() => {
-        if (isAuthenticated && profileSetupStatus?.completed !== false && profileSetupStatus?.current_step === 'complete') {
+        if (isAuthenticated && profileSetupStatus?.is_completed === true && profileSetupStatus?.current_step === 8) {
             router.replace('/(protected)/(tabs)/home');
-        } else if (isAuthenticated && profileSetupStatus?.completed === false) {
-            router.replace('/onboarding-flow');
-        } 
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 1) {
+            router.replace('/profile-completion/persona');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 2) {
+            router.replace('/profile-completion/user-challanges');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 3) {
+            router.replace('/profile-completion/strategy');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 4) {
+            router.replace('/profile-completion/engagement-plan');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 5) {
+            router.replace('/profile-completion/update-profile');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 6) {
+            router.replace('/profile-completion/contact-sync');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 7) {
+            router.replace('/profile-completion/expertise-level');
+        } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 8) {
+            router.replace('/profile-completion/start-networking');
+        }
     }, [router, isAuthenticated, profileSetupStatus]);
     return (
         <Protected>

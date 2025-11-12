@@ -22,3 +22,19 @@ export interface Contact {
   email?: string;
   contact_name?: string;
 } 
+
+export interface OCRData {
+  full_name: string | null;
+  phone_number: string | null;
+  location: string | null;
+  designation: string | null;
+  company: string | null;
+  email: string | null;
+}
+
+export interface OCRResponse {
+  status: string;
+  data: OCRData;
+  summary: string;
+}
+

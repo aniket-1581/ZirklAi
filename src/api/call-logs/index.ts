@@ -34,10 +34,13 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 // Create multiple call logs
-export async function createCallLogs(callLogs: CallLogItem[]) {
+export async function createCallLogs(callLogs: CallLogItem[], token: string) {
   return fetchJSON<CallLogResponse[]>(`${BASE_URL}/call-logs`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
     body: JSON.stringify({ call_logs: callLogs }),
   });
 }

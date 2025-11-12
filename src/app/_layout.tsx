@@ -21,7 +21,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Inter: require('../assets/fonts/KoPubBatang-Regular.ttf'),
+    Inter: require('../assets/fonts/Inter_18pt-Regular.ttf'),
     ...FontAwesome.font,
   });
 
@@ -55,7 +55,7 @@ function AppLayout() {
 
   return (
     <>
-      <StatusBar style="auto" hidden />
+      <StatusBar hidden />
       <Slot />
       <Toast />
     </>
