@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [name, setName] = useState(user?.full_name || "Emily Posa");
+  const [name, setName] = useState(user?.full_name || "");
   const [ageGroup, setAgeGroup] = useState(user?.age_group || "");
   const [email, setEmail] = useState(user?.email || "");
   const [location, setLocation] = useState(user?.location || "");
@@ -118,7 +118,8 @@ export default function ProfileScreen() {
     useCallback(() => {
       fetchNotes();
       fetchContacts();
-    }, [token, fetchNotes, fetchContacts])
+      getUserDetails();
+    }, [token, fetchNotes, fetchContacts, getUserDetails])
   );
 
   return (
@@ -169,14 +170,14 @@ export default function ProfileScreen() {
                   marginTop: 10,
                 }}
               >
-                {name}
+                {user?.full_name}
               </Text>
             </View>
 
             <BusinessCard
-              name={name}
-              company={company}
-              designation={profession}
+              name={user?.full_name || ""}
+              company={user?.company || ""}
+              designation={user?.profession || ""}
               email={user?.email || ""}
               mobile={user?.phone_number || ""}
               address={user?.location || ""}

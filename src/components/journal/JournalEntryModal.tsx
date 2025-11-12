@@ -157,6 +157,7 @@ const JournalEntryModal = ({
         setIsEditing(false);
         setNewTitle("");
       }}
+      statusBarTranslucent={true}
     >
       <TouchableOpacity
         activeOpacity={1}
@@ -265,7 +266,7 @@ const JournalEntryModal = ({
                         onPress={() => handleOnPress(action.subtitle, action.title)}
                         className="opacity-100"
                       >
-                        <Text className="text-base text-white font-semibold">
+                        <Text className="text-base text-[#655BC5] font-bold border-b-2 border-[#655BC5]">
                           Add {action.title}
                         </Text>
                       </TouchableOpacity>

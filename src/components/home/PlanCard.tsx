@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Share,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { getGender } from "gender-detection-from-name";
 import { ImageIcons } from "@/utils/ImageIcons";
@@ -44,6 +46,8 @@ export default function PlanCard({ item }: PlanCardProps) {
     gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon;
   return (
     <>
+      {Platform.OS === "android" && <StatusBar hidden />}
+
       <TouchableOpacity
         onPress={() => {
           setSelectedItem(item);
@@ -55,16 +59,18 @@ export default function PlanCard({ item }: PlanCardProps) {
             source={randomUserIcon}
             className="w-14 h-14 rounded-full mr-3"
           />
-          <View className="flex flex-wrap">
+          <View className="flex-col">
             <Text className="text-white font-semibold text-base mb-1">
               {item.contact_name || item.title.split('for ')[1]}
             </Text>
-            <View className="py-1 px-2 bg-[#655BC5] rounded-lg flex items-center">
-              {item.type === "nudge" ? (
-                <Text className="text-white/80 text-sm">Follow Up</Text>
-              ) : (
-                <Text className="text-white/80 text-sm">Meeting Scheduled</Text>
-              )}
+            <View className="flex-row flex-wrap mt-2">
+              <View className="bg-[#655BC5] rounded-lg px-2 py-1">
+                {item.type === "nudge" ? (
+                  <Text className="text-white/80 text-sm">Follow Up</Text>
+                ) : (
+                  <Text className="text-white/80 text-sm">Meeting Scheduled</Text>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -75,6 +81,7 @@ export default function PlanCard({ item }: PlanCardProps) {
         transparent={true}
         animationType="fade"
         onRequestClose={() => setPopupVisible(false)}
+        statusBarTranslucent={true}
       >
         <View className="flex-1 justify-center items-center bg-black/50">
           <View className="bg-[#5248A0] m-5 rounded-2xl p-6 w-96 relative">

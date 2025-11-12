@@ -1,10 +1,9 @@
-import { View, Text, TouchableOpacity } from "react-native";
-import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
 import { getStepData, setUserStrategy } from "@/api/profile";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import NetworkIntro from "@/components/profile/NetworkIntro";
-import Toast from "react-native-toast-message";
+import { useAuth } from "@/context/AuthContext";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
 export default function Strategy() {
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
@@ -15,7 +14,7 @@ export default function Strategy() {
   useEffect(() => {
     const fetchStepData = async () => {
       try {
-        const res = await getStepData(token!, profileSetupStatus?.next_step!);
+        const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
       } catch (err) {
         console.error(err);
@@ -37,7 +36,6 @@ export default function Strategy() {
       const res = await setUserStrategy(token!, selected);
       if (res) {
         await getProfileSetupStatus();
-        Toast.show({ type: "success", text1: "Strategy Set" });
       }
     }
   };

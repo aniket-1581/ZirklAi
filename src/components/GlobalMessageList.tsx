@@ -287,14 +287,16 @@ export default function GlobalMessageList({
                   </View>
                 </View>
               )}
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{
-                  gap: 10,
-                  display: "flex",
-                  flexDirection: "row"
+                  paddingRight: 16, // Add side padding to prevent clipping
+                  columnGap: 10,         // Consistent gap between cards
                 }}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                overScrollMode="never"
               >
                 {suggestionOnly.map((msg: string, idx: number) => {
                   const copyKey = `msg-${index}-${idx}`;
@@ -304,62 +306,38 @@ export default function GlobalMessageList({
                   return (
                     <View
                       key={idx}
-                      className="w-80 flex-row items-center mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4"
+                      style={{
+                        marginRight: idx === suggestionOnly.length - 1 ? 36 : 0, // right padding for last card
+                      }}
+                      className="flex-row w-80 items-center mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4"
                     >
-                        <View className="mb-2">
-                          {renderFormattedText(trimmedMsg)}
-                        </View>
-
-                      {/* Only show copy icon for Message 1, 2, 3 parts */}
+                      <View className="mb-2 flex-1 pr-8"> {/* ensures text doesn't go under icons */}
+                        {renderFormattedText(trimmedMsg)}
+                      </View>
 
                       {(trimmedMsg.includes("Message 1:") ||
                         trimmedMsg.includes("Message 2:") ||
                         trimmedMsg.includes("Message 3:")) && (
-                          <View className="absolute right-2 top-2 flex-row gap-4">
-                            <TouchableOpacity
-                              onPress={() => handleCopy(trimmedMsg, copyKey)}
-                            >
-                              <MaterialIcons
-                                name={isCopied ? "check" : "content-copy"}
-                                size={18}
-                                color={isCopied ? "#10B981" : "#9CA3AF"}
-                              />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => handleShare(trimmedMsg.split(":")[1])}
-                            >
-                              <MaterialIcons
-                                name="share"
-                                size={18}
-                                color="#9CA3AF"
-                              />
-                            </TouchableOpacity>
-                          </View>
-                      )}
-
-                      {/* Calendar button for messages with start_time */}
-                      {item.start_time &&
-                        !(
-                          trimmedMsg.includes("Message 1:") ||
-                          trimmedMsg.includes("Message 2:") ||
-                          trimmedMsg.includes("Message 3:")
-                        ) &&
-                        !createdEventIds.has(item.start_time) && (
-                          <TouchableOpacity
-                            className="absolute right-2 top-2 bg-blue-50 border border-blue-200 rounded-full p-1.5"
-                            onPress={() => handleCreateCalendarEvent(item)}
-                          >
+                        <View className="absolute right-2 top-2 flex-row gap-4">
+                          <TouchableOpacity onPress={() => handleCopy(trimmedMsg, copyKey)}>
                             <MaterialIcons
-                              name="event"
-                              size={14}
-                              color="#3B82F6"
+                              name={isCopied ? "check" : "content-copy"}
+                              size={18}
+                              color={isCopied ? "#10B981" : "#9CA3AF"}
                             />
                           </TouchableOpacity>
-                        )}
+                          <TouchableOpacity
+                            onPress={() => handleShare(trimmedMsg.split(":")[1])}
+                          >
+                            <MaterialIcons name="share" size={18} color="#9CA3AF" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                   );
                 })}
               </ScrollView>
+
               {adviceOrTips.map((tip: string, idx: number) => {
                 const trimmedTip = tip.trim();
                 return (
@@ -458,11 +436,24 @@ export default function GlobalMessageList({
             </View>
             <View className="flex-row w-full flex-wrap justify-start">
               {item?.options?.map((opt: any, index: number) => {
-                const gender = getGender(opt.name, "en");
-                const randomUserIcon =
-                  gender === "male"
-                    ? ImageIcons.MenImage
-                    : ImageIcons.WomanImage;
+                const gender = getGender(opt.name.split(" ")[0], "en");
+                const femaleUserIcon = [
+                  ImageIcons.GirlImage,
+                  ImageIcons.GirlImage2,
+                  ImageIcons.GirlImage3,
+                  ImageIcons.GirlImage4,
+                ];
+                const maleUserIcon = [
+                  ImageIcons.BoyImage,
+                  ImageIcons.BoyImage2,
+                  ImageIcons.BoyImage3,
+                ];
+                const randomFemaleUserIcon =
+                  femaleUserIcon[
+                    Math.floor(Math.random() * femaleUserIcon.length)
+                  ];
+                const randomMaleUserIcon =
+                  maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
                 return (
                   <TouchableOpacity
                     key={index}
@@ -470,9 +461,14 @@ export default function GlobalMessageList({
                     className="w-[40%] rounded-xl p-3 mr-5 mb-4 bg-[#5248A0] border border-white/15 items-center"
                   >
                     {/* Avatar/Image */}
-                    {randomUserIcon && (
+                    {gender === "male" ? (
                       <Image
-                        source={randomUserIcon}
+                        source={randomMaleUserIcon}
+                        className="w-6 h-6 rounded-full mb-2"
+                      />
+                    ) : (
+                      <Image
+                        source={randomFemaleUserIcon}
                         className="w-6 h-6 rounded-full mb-2"
                       />
                     )}
@@ -616,5 +612,4 @@ export default function GlobalMessageList({
       }}
     />
   );
-
 }

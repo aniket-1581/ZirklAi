@@ -1,26 +1,19 @@
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
-import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
-import {
-  getStepData,
-  setUserPersona,
-  setPhoneContacts,
-  setContactSync,
-  getPhoneContacts,
-} from "@/api/profile";
-import {
-  Ionicons,
-  MaterialIcons,
-  FontAwesome5,
-  Entypo,
-} from "@expo/vector-icons";
-import Toast from "react-native-toast-message";
-import { useContactSync } from "@/hooks/useContactSync";
-import ContactSyncService from "@/utils/ContactSyncService";
-import SuccessPopup from "@/components/SuccessPopup";
-import ContactSelector from "@/components/ContactSelector";
-import { Contact } from "@/types";
 import { createNote, getNotes } from "@/api/notes";
+import {
+  getPhoneContacts,
+  getStepData,
+  setContactSync,
+  setPhoneContacts,
+} from "@/api/profile";
+import ContactSelector from "@/components/ContactSelector";
+import SuccessPopup from "@/components/SuccessPopup";
+import { useAuth } from "@/context/AuthContext";
+import { useContactSync } from "@/hooks/useContactSync";
+import { Contact } from "@/types";
+import ContactSyncService from "@/utils/ContactSyncService";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 // Utility for delay
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -28,7 +21,6 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 export default function ContactSync() {
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
   const { syncContacts, refreshContacts } = useContactSync();
-  const [selected, setSelected] = useState<string | null>(null);
   const [stepData, setStepData] = useState<{
     google: boolean;
     linkedin: boolean;
@@ -52,7 +44,7 @@ export default function ContactSync() {
   useEffect(() => {
     const fetchStepData = async () => {
       try {
-        const res = await getStepData(token!, profileSetupStatus?.next_step!);
+        const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
       } catch (err) {
         console.error(err);
@@ -106,7 +98,7 @@ export default function ContactSync() {
           email: c.emails,
         }));
 
-        const res = await setPhoneContacts(token, formatted);
+        await setPhoneContacts(token, formatted);
 
         setSyncedContactsCount(currentContacts.length);
         setShowSuccessPopup(true);
@@ -139,11 +131,31 @@ export default function ContactSync() {
 
   const handleNext = async () => {
     if (!token) return;
+    setIsWaitingForResponse(true);
     try {
+      const selected = (savedContacts || [])
+        .filter((c) => selectedContacts.includes(c.name))
+        .map((c) => ({
+          contact_id: c.id,
+          contact_name: c.name,
+          goals: "",
+        }))
+        .filter((c) => c.contact_name && c.contact_name !== "Unknown Contact");
+
+      if (selected.length === 0) {
+        Toast.show({
+          type: "error",
+          text1: "No valid contacts selected.",
+        });
+        return;
+      }
+      await createNote(token, selected);
+
+      await delay(1000);
+      await loadNotes();
       const res = await setContactSync(token!, stepData);
       if (res) {
         await getProfileSetupStatus();
-        Toast.show({ type: "success", text1: "Contacts synced successfully" });
       }
     } catch (error) {
       console.error("Contact sync error:", error);
@@ -163,41 +175,7 @@ export default function ContactSync() {
   };
 
   const handleContactSelection = async () => {
-    if (!token) return;
-    setIsWaitingForResponse(true);
-    try {
-      const selected = (savedContacts || [])
-        .filter((c) => selectedContacts.includes(c.name))
-        .map((c) => ({
-          contact_id: c.id,
-          contact_name: c.name,
-          goals: "",
-        }))
-        .filter((c) => c.contact_name && c.contact_name !== "Unknown Contact");
-
-      if (selected.length === 0) {
-        Toast.show({
-          type: "error",
-          text1: "No valid contacts selected.",
-        });
-        return;
-      }
-
-      await createNote(token, selected);
-
-      await delay(1000);
-      await loadNotes();
       setShowContactSelector(false);
-    } catch (error) {
-      console.error("Contact selection failed:", error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to save contacts.",
-      });
-    } finally {
-      setIsWaitingForResponse(false);
-
-    }
   };
 
   useEffect(() => {
@@ -236,26 +214,19 @@ export default function ContactSync() {
                     + Add People
                     </Text>
                 </TouchableOpacity>
-                {notes?.length > 0 && (
+                {selectedContacts?.length > 0 && (
                     <View>
                       <Text className="text-[#C7C2ED] mb-2 font-medium">
                           Your Added Contacts
                       </Text>
-                      {notes.map((note, index) => (
+                      {selectedContacts.map((contact, index) => (
                           <View
                           key={index}
                           className="bg-[#c6bfff]/10 border border-white/10 rounded-xl p-4 mt-3"
                           >
                           <Text className="text-white font-semibold text-lg mb-1">
-                              {note.contact_name}
+                              {contact}
                           </Text>
-                          {note.goals ? (
-                              <Text className="text-[#C7C2ED] text-sm">{note.goals}</Text>
-                          ) : (
-                              <Text className="text-[#C7C2ED]/80 text-sm italic">
-                              No goals added yet
-                              </Text>
-                          )}
                           </View>
                       ))}
                     </View>

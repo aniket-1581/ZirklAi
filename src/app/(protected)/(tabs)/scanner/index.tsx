@@ -410,6 +410,7 @@ export default function ScannerScreen() {
         transparent
         animationType="fade"
         onRequestClose={closeModal}
+        statusBarTranslucent={true}
       >
         <TouchableWithoutFeedback onPress={closeModal}>
           <View className="flex-1 bg-[rgba(0,0,0,0.6)] justify-center items-center">

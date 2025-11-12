@@ -150,6 +150,7 @@ export default function EventCard({
         transparent={true}
         animationType="fade"
         onRequestClose={() => setPopupVisible(false)}
+        statusBarTranslucent={true}
       >
         <View className="flex-1 justify-center items-center bg-black/50">
           <View className="bg-[#5248A0] m-5 rounded-2xl p-6 w-96 relative">

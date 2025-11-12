@@ -1,10 +1,8 @@
 import React, { useRef } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { useAuth } from "@/context/AuthContext";
 import { setStartNetworking } from "@/api/profile";
-import Toast from "react-native-toast-message";
 import { ImageIcons } from "@/utils/ImageIcons";
 
 export default function StartNetworking() {
@@ -15,11 +13,6 @@ export default function StartNetworking() {
     const res = await setStartNetworking(token!);
     if (res) {
       await getProfileSetupStatus();
-      Toast.show({
-        type: "success",
-        text1: "Success",
-        text2: "Your networking system is ready to launch!",
-      });
     }
   };
 

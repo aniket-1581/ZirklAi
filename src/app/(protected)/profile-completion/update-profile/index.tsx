@@ -1,19 +1,18 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
-import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
 import { getStepData, setUserProfile } from "@/api/profile";
-import NetworkIntro from "@/components/profile/NetworkIntro";
-import Toast from "react-native-toast-message";
 import KeyboardAvoidingLayout from "@/components/KeyboardAvoidingLayout";
+import NetworkIntro from "@/components/profile/NetworkIntro";
+import { useAuth } from "@/context/AuthContext";
 import * as Location from "expo-location";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function UpdateProfile() {
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
@@ -24,7 +23,7 @@ export default function UpdateProfile() {
   useEffect(() => {
     const fetchStepData = async () => {
       try {
-        const res = await getStepData(token!, profileSetupStatus?.next_step!);
+        const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setFormValues(res);
       } catch (err) {
         console.error(err);
@@ -80,11 +79,6 @@ export default function UpdateProfile() {
   const handleNext = async () => {
     const res = await setUserProfile(token!, formValues);
     if (res) {
-      Toast.show({
-        type: "success",
-        text1: "Profile updated successfully",
-        text2: "Bonus: Zirkl captures business card instantly",
-      });
       await getProfileSetupStatus();
     }
   };

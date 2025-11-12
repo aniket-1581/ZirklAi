@@ -20,8 +20,8 @@ export async function getProfileStatus(token: string): Promise<ProfileStatusResp
 export async function getStepData(token: string, step_number: number) {
   const res = await fetch(`${BASE_URL}/profile/step/${step_number}`, {
     headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
+      "Accept": "application/json",
+      "Authorization": `Bearer ${token}`,
     },
   });
   if (!res.ok) throw new Error("Failed to fetch step data");

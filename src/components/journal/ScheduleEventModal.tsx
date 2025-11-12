@@ -108,6 +108,7 @@ export const ScheduleEventModal = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
       <View className="flex-1 bg-black/50 justify-center p-6">
         <View className="bg-[#3A327B] rounded-2xl p-6">
