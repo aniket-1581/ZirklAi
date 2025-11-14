@@ -9,6 +9,11 @@ export interface JournalEntryRequest {
   entry: string;
 }
 
+export interface UpdateEntryRequest {
+  entry_id: string;
+  entry: string;
+}
+
 export interface JournalEntriesResponse {
   user_id: string;
   entries: JournalEntryRequest[];
@@ -88,6 +93,27 @@ export async function updateEntryTitle(entryId: string, title: string, token: st
     const errorData = await response.json().catch(() => ({}));
     console.error('Update title error:', errorData);
     throw new Error(errorData.message || 'Failed to update entry title');
+  }
+
+  return response.json();
+}
+
+// Update a journal entry
+export async function updateEntry(entryId: string, entry: string, token: string): Promise<any>  {
+  const response = await fetch(`${BASE_URL}/update_audio_entry/${entryId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'accept': 'application/json',
+    },
+    body: JSON.stringify({ entry }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Update entry error:', errorData);
+    throw new Error(errorData.message || 'Failed to update entry');
   }
 
   return response.json();

@@ -32,7 +32,6 @@ export default function GlobalChatScreen() {
   // Refetch data when screen comes into focus (tab is selected)
   useFocusEffect(
     useCallback(() => {
-      console.log('Global chat screen focused - refetching data');
       loadHistory(); // Refetch chat history when tab is selected
     }, [loadHistory])
   );
@@ -57,11 +56,11 @@ export default function GlobalChatScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text className="text-2xl font-medium text-white">Zirkl Global Chat</Text>
+          <Text className="text-2xl font-medium text-white">Zirkl Assistant</Text>
         </View>
 
         <View className='flex-1 mx-5 mt-4'>
-          <LoadingMessage isLoading={isLoading} message='Setting up your global chat...' />
+          <LoadingMessage isLoading={isLoading} message='Setting up your zirkl assistant...' />
           <GlobalMessageList
             messages={messages}
             isWaitingForResponse={isWaitingForResponse}

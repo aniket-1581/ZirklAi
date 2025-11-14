@@ -36,7 +36,6 @@ export function useContactSync(): UseContactSyncReturn {
       // Set up contact change listener for real-time updates
       if (Platform.OS === 'ios') {
         subscription = Contacts.addContactsChangeListener(async () => {
-          console.log('Contacts changed, refreshing...');
           await refreshContacts();
         });
       }

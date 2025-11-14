@@ -9,6 +9,7 @@ import {
   ScrollView,
   Modal,
   Share,
+  Alert,
 } from "react-native";
 import { getGender } from "gender-detection-from-name";
 import * as Clipboard from "expo-clipboard";
@@ -35,15 +36,33 @@ export default function EventCard({
 
   const { token } = useAuth();
 
-  const handleDelete = async (nudgeId: string) => {
+  const handleDelete = (nudgeId: string) => {
     if (!token) return;
-    try {
-      await handleDeleteNudge?.(nudgeId);
-      setPopupVisible(false);
-    } catch (error) {
-      console.error("Failed to delete nudge:", error);
-    }
+
+    Alert.alert(
+      "Delete Follow-Up",
+      "Are you sure you want to delete this follow-up?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await handleDeleteNudge?.(nudgeId);
+              setPopupVisible(false);
+            } catch (error) {
+              console.error("Failed to delete nudge:", error);
+            }
+          },
+        },
+      ]
+    );
   };
+
 
   const defaultRenderItem = (item: any, index: number) => {
     if (type === "combined") {
@@ -155,12 +174,22 @@ export default function EventCard({
         <View className="flex-1 justify-center items-center bg-black/50">
           <View className="bg-[#5248A0] m-5 rounded-2xl p-6 w-96 relative">
             {/* Close button */}
-            <TouchableOpacity
-              className="absolute top-6 right-6 z-50"
-              onPress={() => setPopupVisible(false)}
-            >
-              <Feather name="x" size={24} color="white" />
-            </TouchableOpacity>
+            <View className="flex-row gap-5 absolute top-6 right-6 z-50">
+              {selectedItem?.type === "nudge" && (
+                <TouchableOpacity
+                  className=""
+                  onPress={() => handleDelete(selectedItem._id)}
+                >
+                  <MaterialIcons name="delete" size={22} color="red" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                className=""
+                onPress={() => setPopupVisible(false)}
+              >
+                <Feather name="x" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
 
             {selectedItem?.type === "followup" ? (
               selectedItem.title.startsWith("Follow Up") ? (
@@ -354,17 +383,6 @@ export default function EventCard({
                   </View>
                 </View>
               </View>
-            )}
-
-            {/* Delete button (for nudges only) */}
-            {selectedItem?.type === "nudge" && (
-              <TouchableOpacity
-                className="flex-row gap-2 items-center justify-center pt-4 border-t border-gray-300 mt-4"
-                onPress={() => handleDelete(selectedItem._id)}
-              >
-                <MaterialIcons name="delete" size={22} color="red" />
-                <Text className="text-red-500 font-semibold">Delete</Text>
-              </TouchableOpacity>
             )}
           </View>
         </View>

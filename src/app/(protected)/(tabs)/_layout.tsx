@@ -115,12 +115,6 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="ocr-scanner/index"
-                options={{
-                    href: null,
-                }}
-            />
-            <Tabs.Screen
                 name="networking-playbook/[id]/index"
                 options={{
                     href: null,

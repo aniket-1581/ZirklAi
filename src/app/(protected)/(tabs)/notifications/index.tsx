@@ -75,7 +75,6 @@ export default function NotificationsScreen() {
   // Refetch data when screen comes into focus (tab is selected)
   useFocusEffect(
     useCallback(() => {
-      console.log("Notifications screen focused - refetching data");
       load(); // Refetch notifications when tab is selected
       loadSnoozed(); // Load snoozed notifications
     }, [load, loadSnoozed])

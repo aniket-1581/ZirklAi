@@ -46,7 +46,6 @@ export const useCallLog = (autoFetch: boolean = true, initialLimit: number = 10)
       setError(null);
 
       const result: CallLogServiceResult = await callLogService.getCallLogs(limit);
-      console.log('Call Logs', result.data);
       
       if (result.success && result.data) {
         setCallLogs(result.data);

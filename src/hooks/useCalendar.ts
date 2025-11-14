@@ -107,7 +107,6 @@ export function useCalendar() {
       };
 
       const syncResult = await syncCalendarEvents(eventsForBackend, token);
-      console.log(`Synced ${syncResult.synced_count} events`);
       
       return syncResult;
     } catch (error) {
@@ -118,7 +117,6 @@ export function useCalendar() {
 
   useEffect(() => {
     syncEventsToBackend(events);
-    console.log("Events synced to backend");
   }, [events]);
 
   return {

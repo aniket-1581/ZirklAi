@@ -21,7 +21,7 @@ export default function ChatsScreen() {
   const [notesContacts, setNotesContacts] = useState<any[]>([]);
   const [phoneContacts, setPhoneContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<'inNetwork' | 'outsideNetwork'>('inNetwork');
+  const [activeSection, setActiveSection] = useState<'chats' | 'mynetwork'>('chats');
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,7 +77,7 @@ export default function ChatsScreen() {
       await delay(2000);
       // Refresh data to move the contact from outside network to in network
       await fetchData();
-      setActiveSection('inNetwork');
+      setActiveSection('chats');
     } catch (err) {
       console.error('Failed to start chat:', err);
     } finally {
@@ -104,33 +104,33 @@ export default function ChatsScreen() {
   return (
     <View className='flex-1 bg-[#3A327B]'>
         {/* Header */}
-        <View className='flex-row items-center justify-center px-5 pt-16'>
+        {/* <View className='flex-row items-center justify-center px-5 pt-16'>
           <Text className='text-2xl font-medium text-white'>Chats</Text>
-        </View>
+        </View> */}
 
         {/* Section Buttons */}
-        <View className='flex-row px-5 mt-3'>
+        <View className='flex-row px-5 mt-16'>
           <TouchableOpacity
-            className={`flex-1 mr-2 py-3 rounded-full ${activeSection === 'inNetwork' ? 'bg-[#DAD8EF]' : 'bg-black/15'}`}
-            onPress={() => setActiveSection('inNetwork')}
+            className={`flex-1 mr-2 py-3 rounded-full ${activeSection === 'chats' ? 'bg-[#DAD8EF]' : 'bg-black/15'}`}
+            onPress={() => setActiveSection('chats')}
           >
-            <Text className={`text-center font-semibold text-sm ${activeSection === 'inNetwork' ? 'text-black' : 'text-white'}`}>
-              In My Network
+            <Text className={`text-center font-semibold text-sm ${activeSection === 'chats' ? 'text-black' : 'text-white'}`}>
+              Chats
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            className={`flex-1 ml-2 py-3 rounded-full ${activeSection === 'outsideNetwork' ? 'bg-[#DAD8EF]' : 'bg-black/15'}`}
-            onPress={() => setActiveSection('outsideNetwork')}
+            className={`flex-1 ml-2 py-3 rounded-full ${activeSection === 'mynetwork' ? 'bg-[#DAD8EF]' : 'bg-black/15'}`}
+            onPress={() => setActiveSection('mynetwork')}
           >
-            <Text className={`text-center font-semibold text-sm ${activeSection === 'outsideNetwork' ? 'text-black' : 'text-white'}`}>
-              Outside My Network
+            <Text className={`text-center font-semibold text-sm ${activeSection === 'mynetwork' ? 'text-black' : 'text-white'}`}>
+              My Network
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* In My Network Section */}
-        {activeSection === 'inNetwork' && (
+        {activeSection === 'chats' && (
           <View className='flex-1 px-5 mt-8'>
             <View className='flex-row items-center justify-start mb-4'>
               <Text className='text-white/70 font-medium text-lg'>Recent Chats</Text>
@@ -146,7 +146,7 @@ export default function ChatsScreen() {
         )}
 
         {/* Outside My Network Section */}
-        {activeSection === 'outsideNetwork' && (
+        {activeSection === 'mynetwork' && (
           <View className='px-5 mt-8'>
             <View className='flex-row items-center justify-start mb-4'>
               <Text className='text-white/70 font-medium text-lg'>My Contacts</Text>

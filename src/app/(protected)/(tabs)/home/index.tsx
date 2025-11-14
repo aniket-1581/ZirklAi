@@ -12,11 +12,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useNudges } from "@/hooks/useNudges";
 import { Contact } from "@/types";
+import { getGreetingByIST, getGrowthMessageOnce } from "@/utils/date";
 import { ImageIcons } from "@/utils/ImageIcons";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
   ImageBackground,
@@ -37,6 +38,7 @@ export default function Home() {
   >([]);
   const { nudges, fetchNudges, deleteNudgeById } = useNudges();
   const { token, user } = useAuth();
+  const growthMessage = useMemo(() => getGrowthMessageOnce(), []); 
 
   const handleDeleteNudge = async (nudgeId: string) => {
     if (!token) return;
@@ -163,8 +165,11 @@ export default function Home() {
 
         {/* Greeting Text */}
         <View className="px-5">
-          <Text className="text-xl font-bold text-white mb-4">
-            Good Morning, {user?.full_name.split(" ")[0]}
+          <Text className="text-xl font-bold text-white mb-3">
+            {getGreetingByIST()}, {user?.full_name.split(" ")[0]}
+          </Text>
+          <Text className="text-white text-base mb-4">
+            {growthMessage}
           </Text>
           <TouchableOpacity
             className="bg-black/15 flex-row gap-2 items-center justify-center rounded-xl py-3 border border-white/15"

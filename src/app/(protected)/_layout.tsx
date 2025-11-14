@@ -2,11 +2,13 @@ import { Stack, useRouter } from 'expo-router';
 import Protected from '@/components/Protected';
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { requestAllPermissions } from '@/utils/requestAllPermissions';
 export default function ProtectedLayout() {
     const { isAuthenticated, profileSetupStatus } = useAuth();
     const router = useRouter();
     useEffect(() => {
         if (isAuthenticated && profileSetupStatus?.is_completed === true && profileSetupStatus?.current_step === 8) {
+            requestAllPermissions();
             router.replace('/(protected)/(tabs)/home');
         } else if (isAuthenticated && profileSetupStatus?.is_completed === false && profileSetupStatus?.next_step === 1) {
             router.replace('/profile-completion/persona');

@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ScheduleEventModal } from "@/components/journal/ScheduleEventModal";
@@ -38,7 +39,7 @@ interface JournalEntryModalProps {
   onUpdateTitle?: (entryId: string, newTitle: string) => Promise<void>;
   onDelete?: (entryId: string) => Promise<void>;
   isDeleting?: boolean;
-  startInEditMode?: boolean;
+  onUpdateEntry?: (entryId: string, newEntry: string) => Promise<void>;
 }
 
 const JournalEntryModal = ({
@@ -48,10 +49,12 @@ const JournalEntryModal = ({
   onUpdateTitle,
   onDelete,
   isDeleting,
-  startInEditMode,
+  onUpdateEntry,
 }: JournalEntryModalProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [newTitle, setNewTitle] = useState(entry?.title || "");
+  const [newTitle, setNewTitle] = useState(entry?.title);
+  const [isEditingEntry, setIsEditingEntry] = useState(false);
+  const [newEntry, setNewEntry] = useState(entry?.entry);
   const [isUpdating, setIsUpdating] = useState(false);
   const { createDeviceEvent } = useCalendar();
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -91,7 +94,7 @@ const JournalEntryModal = ({
   };
 
   const handleSaveTitle = async () => {
-    if (!entry || !onUpdateTitle || !newTitle.trim()) {
+    if (!entry || !onUpdateTitle || !newTitle?.trim()) {
       setIsEditing(false);
       return;
     }
@@ -106,6 +109,30 @@ const JournalEntryModal = ({
     } finally {
       setIsUpdating(false);
       setNewTitle("");
+    }
+  };
+
+  const handleSaveEntry = async () => {
+    if (
+      !entry ||
+      !onUpdateEntry ||
+      !newEntry?.trim() ||
+      entry.entry === newEntry
+    ) {
+      setIsEditingEntry(false);
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      await onUpdateEntry(entry.entry_id, newEntry);
+      setIsEditingEntry(false);
+    } catch (error) {
+      console.error("Failed to update entry:", error);
+      Alert.alert("Error", "Failed to update entry");
+    } finally {
+      setIsUpdating(false);
+      setNewEntry("");
     }
   };
 
@@ -133,13 +160,6 @@ const JournalEntryModal = ({
     ]);
   };
 
-  useEffect(() => {
-    if (startInEditMode) {
-      setIsEditing(true);
-      setNewTitle(entry?.title || "");
-    }
-  }, [startInEditMode, entry]);
-
   if (!entry) return null;
 
   const handleOnPress = (subtitle: string, title: string) => {
@@ -155,7 +175,9 @@ const JournalEntryModal = ({
       onRequestClose={() => {
         onClose();
         setIsEditing(false);
-        setNewTitle("");
+        setIsEditingEntry(false);
+        setNewTitle(entry.title || "");
+        setNewEntry(entry.entry || "");
       }}
       statusBarTranslucent={true}
     >
@@ -165,131 +187,177 @@ const JournalEntryModal = ({
         onPress={() => {
           onClose();
           setIsEditing(false);
-          setNewTitle("");
+          setIsEditingEntry(false);
+          setNewTitle(entry.title || "");
+          setNewEntry(entry.entry || "");
         }}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          className="bg-[#3A327B] p-6 rounded-xl"
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View className="flex-row justify-between gap-2 items-center mb-4">
-            {isEditing ? (
-              <View className="flex-1 flex-row items-center border-b border-gray-200 pb-1">
-                <TextInput
-                  value={newTitle}
-                  onChangeText={setNewTitle}
-                  className="flex-1 text-xl font-bold text-[#1F2937]"
-                  autoFocus
-                  onSubmitEditing={handleSaveTitle}
-                />
-                <TouchableOpacity
-                  onPress={handleSaveTitle}
-                  disabled={isUpdating}
-                  className="ml-2 p-1"
-                >
+        {isUpdating ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#3A327B" />
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={1}
+            className="bg-[#3A327B] p-6 rounded-xl"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="flex-row justify-between gap-2 items-center mb-4">
+              {isEditing ? (
+                <View className="flex-1 flex-row items-center border-b border-gray-200 pb-1">
+                  <TextInput
+                    value={newTitle}
+                    onChangeText={setNewTitle}
+                    className="flex-1 text-xl font-bold text-white"
+                    autoFocus
+                    onSubmitEditing={handleSaveTitle}
+                  />
+                  <TouchableOpacity
+                    onPress={handleSaveTitle}
+                    disabled={isUpdating}
+                    className="ml-2 p-1"
+                  >
+                    <Ionicons
+                      name="checkmark"
+                      size={24}
+                      color={isUpdating ? "#9CA3AF" : "#10B981"}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <Text
+                    className="text-xl font-bold text-white flex-1"
+                    onPress={() => {
+                      setIsEditing(true);
+                      setIsEditingEntry(false);
+                      setNewTitle(entry.title);
+                    }}
+                  >
+                    {entry.title || "Untitled"}
+                  </Text>
+                </>
+              )}
+              {onDelete && (
+                <TouchableOpacity onPress={handleDelete} disabled={isDeleting}>
                   <Ionicons
-                    name="checkmark"
+                    name="trash-outline"
                     size={24}
-                    color={isUpdating ? "#9CA3AF" : "#10B981"}
+                    color={isDeleting ? "#9CA3AF" : "#EF4444"}
                   />
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <Text
-                  className="text-xl font-bold text-white flex-1"
-                  onPress={() => setIsEditing(true)}
-                >
-                  {entry.title || "Untitled"}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setIsEditing(true)}
-                  className="ml-2 p-1"
-                >
-                  <Ionicons name="pencil" size={18} color="white" />
-                </TouchableOpacity>
-              </>
-            )}
-            {onDelete && (
-              <TouchableOpacity onPress={handleDelete} disabled={isDeleting}>
+              )}
+              <TouchableOpacity onPress={onClose} className="p-1">
                 <Ionicons
-                  name="trash-outline"
+                  name="close"
                   size={24}
-                  color={isDeleting ? "#9CA3AF" : "#EF4444"}
+                  color={isDeleting ? "#9CA3AF" : "white"}
                 />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={onClose} className="p-1">
-              <Ionicons
-                name="close"
-                size={24}
-                color={isDeleting ? "#9CA3AF" : "white"}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <Text className="text-sm text-white mb-4">
-            {new Date(entry.timestamp).toLocaleString()}
-          </Text>
-
-          <ScrollView className="mb-4 max-h-[60%] bg-[#655BC5] p-2 rounded-xl">
-            <Text className="text-base text-white">{entry.entry}</Text>
-          </ScrollView>
-
-          {entry.tags && entry.tags.length > 0 && (
-            <View className="flex-row flex-wrap mt-2">
-              {entry.tags.map((tag, index) => (
-                <View
-                  key={index}
-                  className="bg-black/15 rounded-full px-3 py-2 mr-2 mb-2"
-                >
-                  <Text className="text-white text-base">#{tag}</Text>
-                </View>
-              ))}
             </View>
-          )}
 
-          {entry.suggested_actions && entry.suggested_actions.length > 0 && (
-            <View className="mt-3">
-              <Text className="text-lg font-bold text-white mb-2">
-                Suggested Actions
-              </Text>
-              {entry.suggested_actions && entry.suggested_actions.length > 0 && (() => {
-                const action = entry.suggested_actions[0]; // 👈 Show only the first action
-                const isScheduled = scheduledActions.includes(action.title);
+            <Text className="text-sm text-white mb-4">
+              {new Date(entry.timestamp).toLocaleString()}
+            </Text>
 
-                return (
-                  <View className="flex items-start justify-between mb-2">
-                    {!isScheduled ? (
-                      <TouchableOpacity
-                        onPress={() => handleOnPress(action.subtitle, action.title)}
-                        className="opacity-100"
-                      >
-                        <Text className="text-base text-[#655BC5] font-bold border-b-2 border-[#655BC5]">
-                          Add {action.title}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View className="flex-row items-center opacity-60">
-                        <Ionicons
-                          name="checkmark-circle-outline"
-                          size={18}
-                          color="#10B981"
-                        />
-                        <Text className="ml-1 text-base text-white">
-                          Added to your Follow-Ups
-                        </Text>
-                      </View>
-                    )}
+            <View className="mb-4 bg-[#655BC5] p-2 rounded-xl">
+              <ScrollView>
+                {isEditingEntry ? (
+                  <View className="flex-row items-start gap-2">
+                    <TextInput
+                      value={newEntry}
+                      onChangeText={setNewEntry}
+                      className="text-base text-white border border-gray-200 rounded-xl flex-1"
+                      autoFocus
+                      onSubmitEditing={handleSaveEntry}
+                      multiline
+                      numberOfLines={10}
+                    />
+                    <TouchableOpacity
+                      onPress={handleSaveEntry}
+                      disabled={isUpdating}
+                      className="p-1"
+                    >
+                      <Ionicons
+                        name="checkmark"
+                        size={24}
+                        color={isUpdating ? "#9CA3AF" : "#10B981"}
+                      />
+                    </TouchableOpacity>
                   </View>
-                );
-              })()}
-
+                ) : (
+                  <Text
+                    className="text-base text-white flex-1"
+                    onPress={() => {
+                      setIsEditingEntry(true);
+                      setIsEditing(false);
+                      setNewEntry(entry.entry);
+                    }}
+                  >
+                    {entry.entry}
+                  </Text>
+                )}
+              </ScrollView>
             </View>
-          )}
-        </TouchableOpacity>
+
+            {entry.tags && entry.tags.length > 0 && (
+              <View className="flex-row flex-wrap mt-2">
+                {entry.tags.map((tag, index) => (
+                  <View
+                    key={index}
+                    className="bg-black/15 rounded-full px-3 py-2 mr-2 mb-2"
+                  >
+                    <Text className="text-white text-base">#{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {entry.suggested_actions && entry.suggested_actions.length > 0 && (
+              <View className="mt-3">
+                <Text className="text-lg font-bold text-white mb-2">
+                  Suggested Actions
+                </Text>
+                {entry.suggested_actions &&
+                  entry.suggested_actions.length > 0 &&
+                  (() => {
+                    const action = entry.suggested_actions[0]; // 👈 Show only the first action
+                    const isScheduled = scheduledActions.includes(action.title);
+
+                    return (
+                      <View className="flex items-start justify-between mb-2">
+                        {!isScheduled ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              handleOnPress(action.subtitle, action.title)
+                            }
+                            className="opacity-100"
+                          >
+                            <Text className="text-base text-[#655BC5] font-bold border-b-2 border-[#655BC5]">
+                              Add {action.title}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View className="flex-row items-center opacity-60">
+                            <Ionicons
+                              name="checkmark-circle-outline"
+                              size={18}
+                              color="#10B981"
+                            />
+                            <Text className="ml-1 text-base text-white">
+                              Added to your Follow-Ups
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
+
       <ScheduleEventModal
         visible={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
@@ -317,7 +385,6 @@ const JournalEntryModal = ({
             }
           }
         }}
-
       />
     </Modal>
   );

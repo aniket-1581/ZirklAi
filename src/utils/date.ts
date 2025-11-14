@@ -20,3 +20,36 @@ export function formatUtcToIstTime(utcDate: string | Date): string {
   let displayHours = istHoursUTC % 12;
   return displayHours === 0 ? `12:${istMinutesUTC.toString().padStart(2, '0')} ${period}` : `${displayHours}:${istMinutesUTC.toString().padStart(2, '0')} ${period}`;
 }
+
+export function getGreetingByIST() {
+  // Get current time in IST
+  const istTime = new Date().toLocaleString("en-US", {
+    timeZone: "Asia/Kolkata",
+  });
+
+  const date = new Date(istTime);
+  const hour = date.getHours(); // 0–23
+
+  if (hour >= 0 && hour < 12) return "Good Morning";
+  if (hour >= 12 && hour < 16) return "Good Afternoon";
+  return "Good Evening";
+}
+
+export function getGrowthMessageOnce() {
+  const growthMessages = [
+    "Let's nurture your network today",
+    "Ready to strengthen your connections?",
+    "Let's build meaningful relationships today",
+    "Your network is your growth—let's expand it",
+    "Small interactions build powerful networks",
+    "Today is a great day to connect intentionally",
+    "Grow your relationships, grow your success",
+    "Let's create opportunities through connection",
+    "Your next big opportunity may start with one message",
+    "Let's reconnect with someone who matters"
+  ];
+
+  const randomIndex = Math.floor(Math.random() * growthMessages.length);
+  return growthMessages[randomIndex];
+}
+

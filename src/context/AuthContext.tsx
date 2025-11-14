@@ -15,7 +15,8 @@ import { createCallLogs } from "@/api/call-logs";
 import { registerAndSendFcmToken } from "@/api/notifications";
 import CallLogService from "@/utils/CallLogService";
 import { getProfileStatus, ProfileStatusResponse } from "@/api/profile";
-import { requestAllPermissions } from "@/utils/requestAllPermissions";
+import { initMixpanel, identify, track, setUserProps, resetMixpanel } from "@/lib/mixpanel";
+
 
 interface User {
   id: string;
@@ -70,8 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initAuth = async () => {
       try {
-        const storedToken = await AsyncStorage.getItem("userToken");
+        // MIXPANEL: initialize analytics
+        await initMixpanel();
 
+        const storedToken = await AsyncStorage.getItem("userToken");
         if (isMounted) {
           setToken(storedToken);
           setReady(true);
@@ -89,12 +92,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+
   const getUserDetails = useCallback(async () => {
     if (!token) return;
 
     try {
       const res = (await getUser(token)) as User;
       setUser(res);
+
+      // MIXPANEL: Identify user & set properties
+      identify(res.id);
+      setUserProps({
+        full_name: res.full_name,
+        age_group: res.age_group,
+        profession: res.profession,
+        location: res.location,
+        email: res.email,
+      });
     } catch (err: any) {
       console.error("getUserDetails error:", err);
 
@@ -140,7 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [token]);
 
   const syncCallLogsToServer = useCallback(async () => {
-    console.log("Syncing call logs to server...");
     if (!token) return;
 
     const callLogService = CallLogService.getInstance();
@@ -160,7 +173,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const result = await callLogService.getCallLogs(100);
 
       if (result.success && result.data && result.data.length > 0) {
-        console.log(`Found ${result.data.length} call logs to sync.`);
         const logsToSave = result.data.map((log) => ({
           dateTime: log.dateTime,
           duration: log.duration,
@@ -172,7 +184,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (logsToSave.length > 0) {
           await createCallLogs(logsToSave, token);
-          console.log("Call logs synced successfully.");
         } else {
           console.log("No call logs to sync.");
         }
@@ -194,7 +205,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           await getProfileSetupStatus();
           await getNotificationToken();
           await syncCallLogsToServer();
-          await requestAllPermissions();
         } catch (err) {
           console.error("Error initializing user session:", err);
 
@@ -268,6 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           await AsyncStorage.setItem("userToken", res.access_token);
           setToken(res.access_token);
 
+          // MIXPANEL: track login event
+          track("Login", { phoneNumber });
 
           Toast.show({ type: "success", text1: "Login Successful" });
           router.replace("/(protected)/(tabs)/home");
@@ -297,6 +309,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
+      // MIXPANEL: track logout
+      track("Logout");
+
+      // MIXPANEL: reset anonymous state
+      resetMixpanel();
+
       await AsyncStorage.multiRemove(["userToken"]);
       setToken(null);
       setUser(null);

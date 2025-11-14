@@ -43,6 +43,7 @@ export default function GlobalMessageList({
     new Set()
   );
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
 
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
@@ -152,6 +153,15 @@ export default function GlobalMessageList({
         visibilityTime: 3000,
       });
     }
+  };
+
+  const handleScroll = (event: any) => {
+    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+    
+    const isAtBottom =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+
+    setIsUserAtBottom(isAtBottom);
   };
 
   const renderFormattedText = (text: string) => {
@@ -311,7 +321,7 @@ export default function GlobalMessageList({
                       }}
                       className="flex-row w-80 items-center mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4"
                     >
-                      <View className="mb-2 flex-1 pr-8"> {/* ensures text doesn't go under icons */}
+                      <View className="mb-2 flex-1 pr-8">
                         {renderFormattedText(trimmedMsg)}
                       </View>
 
@@ -388,7 +398,7 @@ export default function GlobalMessageList({
             <Text className="text-white text-base mb-3">
               {item.content
                 ? item.content
-                : "Welcome to Zirkl Global Chat! How can I assist you today?"}
+                : "Welcome to Zirkl Assistant! How can I assist you today?"}
             </Text>
 
             <View className="flex-row flex-wrap justify-between">
@@ -430,7 +440,7 @@ export default function GlobalMessageList({
               <Text className="text-white text-base mb-3">
                 {item.content
                   ? item.content
-                  : "Welcome to Zirkl Global Chat! How can I assist you today?"}
+                  : "Welcome to Zirkl Assistant! How can I assist you today?"}
               </Text>
               {/* <Text className='text-white text-xs text-right'>{time12}</Text> */}
             </View>
@@ -498,7 +508,7 @@ export default function GlobalMessageList({
           ) : (
             <Image
               source={ImageIcons.Assistant}
-              className="w-10 h-10 ml-2 rounded-full"
+              className="w-10 h-10 mr-2 rounded-full"
             />
           )}
           <View
@@ -594,20 +604,12 @@ export default function GlobalMessageList({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 100 : 0 }}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       onContentSizeChange={() => {
-        // Always scroll to bottom when content height changes (new messages, initial render)
-        if (flatListRef.current && messages.length > 0) {
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }, 100);
-        }
-      }}
-      onLayout={() => {
-        // Ensures we scroll once layout stabilizes
-        if (flatListRef.current && messages.length > 0) {
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }, 300);
+        // Auto-scroll ONLY if user is at the bottom
+        if (isUserAtBottom) {
+          flatListRef.current?.scrollToEnd({ animated: false });
         }
       }}
     />

@@ -14,7 +14,8 @@
         "EXPO_PUBLIC_WS_URL": "wss://netmate.mettasocial.com",
         "EXPO_PUBLIC_WEB_CLIENT_ID":"102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
         "EXPO_PUBLIC_IOS_CLIENT_ID":"102424279215-hlpuesti6jvk8r9a9e6o7r9llilajqvl.apps.googleusercontent.com",
-        "EXPO_PUBLIC_ANDROID_CLIENT_ID":"102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com"
+        "EXPO_PUBLIC_ANDROID_CLIENT_ID":"102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "4869892ee56d5ae0842d0dea3e0ad559"
       },
       "ios": {
         "distribution": "internal"
@@ -28,7 +29,8 @@
         "EXPO_PUBLIC_WS_URL": "wss://netmate.mettasocial.com",
         "EXPO_PUBLIC_WEB_CLIENT_ID": "102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
         "EXPO_PUBLIC_IOS_CLIENT_ID": "102424279215-hlpuesti6jvk8r9a9e6o7r9llilajqvl.apps.googleusercontent.com",
-        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com"
+        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "4869892ee56d5ae0842d0dea3e0ad559"
       }
     },
     "simulator": {
@@ -40,7 +42,8 @@
         "EXPO_PUBLIC_WS_URL": "wss://netmate.mettasocial.com",
         "EXPO_PUBLIC_WEB_CLIENT_ID": "102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
         "EXPO_PUBLIC_IOS_CLIENT_ID": "102424279215-hlpuesti6jvk8r9a9e6o7r9llilajqvl.apps.googleusercontent.com",
-        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com"
+        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "4869892ee56d5ae0842d0dea3e0ad559"
       }
     },
     "production": {
@@ -50,7 +53,8 @@
         "EXPO_PUBLIC_WS_URL": "wss://netmate.mettasocial.com",
         "EXPO_PUBLIC_WEB_CLIENT_ID": "102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
         "EXPO_PUBLIC_IOS_CLIENT_ID": "102424279215-hlpuesti6jvk8r9a9e6o7r9llilajqvl.apps.googleusercontent.com",
-        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com"
+        "EXPO_PUBLIC_ANDROID_CLIENT_ID": "102424279215-5jsp3oe3du9kcg9hpk4hil70k2t02bgp.apps.googleusercontent.com",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "4869892ee56d5ae0842d0dea3e0ad559"
       }
     }
   },

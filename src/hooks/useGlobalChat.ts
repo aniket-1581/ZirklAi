@@ -25,7 +25,6 @@ export function useGlobalChat() {
   const hasTriggeredReturningRef = useRef(false);
 
   const normalizeMessages = (data: any): Message[] => {
-    console.log("Normalizing messages:", data);
     if (!data) return [];
 
     let messageList: any[] = [];
@@ -65,7 +64,6 @@ export function useGlobalChat() {
       }
 
       const history = await getGlobalChatHistory(token);
-      console.log("Fetched history:", history);
       const normalized = normalizeMessages(history);
 
       if (normalized.length > 0) {
@@ -73,14 +71,13 @@ export function useGlobalChat() {
       } else {
         await loadWelcomeMessage();
         const historyAfterWelcome = await getGlobalChatHistory(token);
-        console.log("Fetched history after welcome message:", historyAfterWelcome);
         const normalizedAfterWelcome = normalizeMessages(historyAfterWelcome);
         if (normalizedAfterWelcome.length > 0) {
           setMessages(normalizedAfterWelcome);
         }
       }
     } catch (error) {
-      console.error('Failed to load global chat history:', error);
+      console.error('Failed to load zirkl assistant history:', error);
       Alert.alert('Error', 'Failed to load chat.');
     } finally {
       setIsLoading(false);
@@ -124,7 +121,7 @@ export function useGlobalChat() {
       await globalChatWithLlm(input, token);
       await loadHistory(); // not onEnter
     } catch (error) {
-      console.error('Global chat failed:', error);
+      console.error('Zirkl Assistant failed:', error);
       Alert.alert('Error', 'Failed to send message.');
     } finally {
       setIsWaitingForResponse(false);

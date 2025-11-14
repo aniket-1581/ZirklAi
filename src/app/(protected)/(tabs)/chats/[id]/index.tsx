@@ -7,15 +7,14 @@ import {
   postNoteChatHistory,
 } from "@/api/chat";
 import { getNoteById } from "@/api/notes";
-import CrystalSphereButton from "@/components/CrystalSphereButton";
 import KeyboardLayout from "@/components/KeyboardAvoidingLayout";
 import TypingIndicator from "@/components/TypingIndicator";
 import { useAuth } from "@/context/AuthContext";
 import { ImageIcons } from "@/utils/ImageIcons";
 import { formatUtcToIstTime } from "@/utils/date";
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
 import { getGender } from "gender-detection-from-name";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -59,6 +58,7 @@ export default function ChatScreen() {
   );
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const router = useRouter();
+  const navigation = useNavigation();
 
   const randomFemaleUserIcon = useMemo(
     () => femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)],
@@ -385,6 +385,10 @@ export default function ChatScreen() {
       </View>
     );
   }
+
+  const handleGoBack = () => {
+    router.push('/(protected)/(tabs)/chats');
+  }
   return (
     <View className="flex-1 bg-[#3A327B]">
       <KeyboardLayout>
@@ -392,11 +396,7 @@ export default function ChatScreen() {
         <View className="flex-row items-center px-5 py-4">
           <TouchableOpacity
             className="mr-4"
-            onPress={() =>
-              router.canGoBack()
-                ? router.back()
-                : router.replace("/(protected)/(tabs)/chats")
-            }
+            onPress={handleGoBack}
           >
             <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>

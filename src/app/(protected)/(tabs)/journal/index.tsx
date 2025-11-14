@@ -4,7 +4,8 @@ import {
   getEntries,
   getEntry,
   JournalEntryResponse,
-  updateEntryTitle
+  updateEntryTitle,
+  updateEntry,
 } from "@/api/journal";
 import WaveAnimation from "@/components/WaveAnimation";
 import GradientMicButton from "@/components/journal/GradientMicButton";
@@ -12,25 +13,25 @@ import JournalEntryModal from "@/components/journal/JournalEntryModal";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useNavigation } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
+  FlatList,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
+import { useProcessingMessages } from "@/hooks/useProcessingMessages";
 
 async function readFileAsBase64(uri: string): Promise<string> {
   try {
@@ -47,191 +48,161 @@ async function readFileAsBase64(uri: string): Promise<string> {
 const JournalScreen = () => {
   const navigation = useNavigation();
   const { token } = useAuth();
+
   const [isRecording, setIsRecording] = useState(false);
-  const [entries, setEntries] = useState<JournalEntryResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [rawEntries, setRawEntries] = useState<any>({});
+  const [loadingEntries, setLoadingEntries] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const ws = useRef<WebSocket | null>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
+
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
-
-  // Animated values
-  const fade = useSharedValue(1);
-  const fadeStyle = useAnimatedStyle(() => ({
-    opacity: fade.value,
-  }));
-
-  const coachingMessages = [
-    "Reflecting on what you’ve shared…",
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { processingMessage, fadeStyle } = useProcessingMessages(isProcessing, [
+    "Reflecting on what you've shared…",
     "Identifying the key themes in your voice.",
     "Extracting insights to help you grow your connections.",
     "Highlighting potential follow-ups and next steps.",
     "Turning your reflection into actionable insights.",
-  ];
+  ]);
+  const { processingMessage: loadingMessage, fadeStyle: loadingFadeStyle } = useProcessingMessages(loadingEntries, [
+    "Loading entries…",
+    "Processing entries…",
+    "Sorting entries…",
+    "Loading more entries…",
+    "Processing more entries…",
+    "Sorting more entries…",
+  ]);
+  const { processingMessage: updateMessage, fadeStyle: updateFadeStyle } = useProcessingMessages(isUpdating, [
+    "Updating entry…",
+    "Processing entry…",
+    "Sorting entry…"
+  ]);
 
-  useEffect(() => {
-    if (isProcessing) {
-      let i = 0;
-      setProcessingMessage(coachingMessages[i]);
+  // ------------------------------------------------------------------
+  // LOAD ENTRIES
+  // ------------------------------------------------------------------
 
-      // animate opacity and change text
-      const interval = setInterval(() => {
-        fade.value = 0;
-        setTimeout(() => {
-          i = (i + 1) % coachingMessages.length;
-          setProcessingMessage(coachingMessages[i]);
-          fade.value = withTiming(1, { duration: 600 });
-        }, 400);
-      }, 3500);
-
-      // continuous pulsing animation
-      fade.value = withRepeat(
-        withSequence(
-          withTiming(0.4, { duration: 1500, easing: Easing.ease }),
-          withTiming(1, { duration: 1500, easing: Easing.ease })
-        ),
-        -1,
-        true
-      );
-
-      return () => clearInterval(interval);
-    }
-  }, [isProcessing]);
-
-  // Add this handler function
-  const handleEntryPress = async (entryId: string) => {
-    try {
-      const entryData = await getEntry(entryId, token!);
-      setSelectedEntry(entryData);
-      setIsModalVisible(true);
-    } catch (error) {
-      console.error("Error fetching entry:", error);
-      Alert.alert("Error", "Failed to load journal entry");
-    }
-  };
-
-  // Load entries from API
   const loadEntries = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
     try {
+      setLoadingEntries(true);
+      setError(null);
+
       const response = await getEntries(token!);
-      // Convert the entries object into an array of entries
-      const entriesArray = Object.entries(response.entries || {}).map(
-        ([id, entry]) => ({
-          id,
-          ...entry,
-        })
-      );
-      // Sort by timestamp in descending order (newest first)
-      const sortedEntries = entriesArray.sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-      setEntries(sortedEntries);
+      setRawEntries(response.entries || {});
     } catch (err) {
       console.error("Failed to load entries:", err);
       setError("Failed to load entries. Please try again.");
     } finally {
-      setIsLoading(false);
+      setLoadingEntries(false);
     }
   }, [token]);
 
-  // 🧩 Connect to WebSocket
+  const entries = useMemo(() => {
+    if (!rawEntries) return [];
+
+    return Object.entries(rawEntries)
+      .map(([id, entry]: any) => ({
+        id,
+        ...entry,
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() -
+          new Date(a.timestamp).getTime()
+      );
+  }, [rawEntries]);
+
+
+
+  // ------------------------------------------------------------------
+  // LOAD SINGLE ENTRY (for modal)
+  // ------------------------------------------------------------------
+
+  const handleEntryPress = useCallback(
+    async (entryId: string) => {
+      try {
+        const entryData = await getEntry(entryId, token!);
+        setSelectedEntry(entryData);
+        setIsModalVisible(true);
+      } catch (error) {
+        console.error("Error fetching entry:", error);
+        Alert.alert("Error", "Failed to load journal entry");
+      }
+    },
+    [token]
+  );
+
+  // ------------------------------------------------------------------
+  // WEBSOCKET HANDLER
+  // ------------------------------------------------------------------
+
   useEffect(() => {
     let socket: WebSocket;
     let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const reconnectDelay = 3000; // 3 seconds
 
-    const connectWebSocket = async () => {
+    const connect = async () => {
       try {
-        if (socket) {
-          socket.close();
-        }
-
         socket = await createWebSocketConnection(token!);
         ws.current = socket;
-        reconnectAttempts = 0;
 
         socket.onopen = () => {
-          console.log("✅ WebSocket connected");
           loadEntries();
+          reconnectAttempts = 0;
         };
 
-        socket.onmessage = (event) => {
-          
-          // Handle non-JSON messages (like "Recording started")
-          if (typeof event.data === 'string' && !event.data.trim().startsWith('{') && !event.data.trim().startsWith('[')) {
-            return;
-          }
+        socket.onmessage = (evt) => {
+          const msg = evt.data?.toString().trim();
+
+          if (!msg || (!msg.startsWith("{") && !msg.startsWith("["))) return;
 
           try {
-            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-            
-            if (data?.type === 'processing_complete') {
+            const data = JSON.parse(msg);
+
+            if (data?.type === "processing_complete") {
               setIsProcessing(false);
               loadEntries();
-            } else if (data?.type === 'processing') {
-              setProcessingMessage(data.message || "Processing your recording...");
-            } else if (data?.type === 'journal_entry_complete') {
-              // For other messages, still load entries but don't affect processing state
+            }
+
+            if (data?.type === "journal_entry_complete") {
               loadEntries();
             }
-          } catch (error) {
-            console.error("Error parsing WebSocket message:", error);
-            // Still try to load entries even if there was a parsing error
-            loadEntries();
+          } catch (e: any) {
+            console.warn("WS parse error", e);
           }
         };
 
-        socket.onerror = (error) => {
-          console.error("WebSocket error:", error);
-        };
+        socket.onerror = () => {};
 
         socket.onclose = () => {
-          console.log("❌ WebSocket closed");
-          if (reconnectAttempts < maxReconnectAttempts) {
-            const delay = reconnectDelay * Math.pow(2, reconnectAttempts);
-            console.log(
-              `Attempting to reconnect in ${delay / 1000} seconds...`
-            );
-            setTimeout(connectWebSocket, delay);
+          if (reconnectAttempts < 5) {
+            setTimeout(() => connect(), 2000);
             reconnectAttempts++;
-          } else {
-            setError("Connection lost. Please refresh the page to reconnect.");
           }
         };
-      } catch (error) {
-        console.error("WebSocket connection error:", error);
-        // Try to reconnect after a delay
-        if (reconnectAttempts < maxReconnectAttempts) {
-          setTimeout(connectWebSocket, reconnectDelay);
-          reconnectAttempts++;
-        } else {
-          setError(
-            "Failed to connect to server. Please check your connection and try again."
-          );
-        }
+      } catch (e: any) {
+        console.error("WS connection failed", e);
       }
     };
 
-    connectWebSocket();
+    connect();
 
     return () => {
-      if (ws.current) {
-        ws.current.close();
-        ws.current = null;
-      }
+      ws.current?.close();
+      ws.current = null;
     };
   }, [token, loadEntries]);
 
-  // 🎙️ Start recording (WAV format)
-  const startRecording = async () => {
+  // ------------------------------------------------------------------
+  // RECORDING
+  // ------------------------------------------------------------------
+
+  const startRecording = useCallback(async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
@@ -239,15 +210,13 @@ const JournalScreen = () => {
       }
 
       ws.current?.send("start");
-
-      console.log("Starting WAV recording...");
       setIsRecording(true);
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
 
-      // ✅ WAV output on Android; PCM on iOS (convertible)
       const { recording } = await Audio.Recording.createAsync({
         android: {
           extension: ".wav",
@@ -270,217 +239,225 @@ const JournalScreen = () => {
         },
         web: {
           mimeType: "audio/wav",
-        },
+        }
       });
 
       recordingRef.current = recording;
-
-      // Show recording indicator
-      console.log("🎤 Recording started...");
     } catch (err) {
       console.error("Recording start failed:", err);
-      Alert.alert("Error", "Failed to start recording.");
     }
-  };
+  }, []);
 
-  // ⏹️ Stop recording and send audio data
-  const stopRecording = async () => {
+  const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
 
+    setIsRecording(false);
+    setIsProcessing(true);
+
     try {
-      console.log("⏹️ Stopping recording...");
-      setIsRecording(false);
-      setIsProcessing(true);
-
-      // Stop the recording
       await recordingRef.current.stopAndUnloadAsync();
-
-      // Get the recorded file URI
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
 
-      if (uri && ws.current) {
-        console.log("📤 Sending audio data...");
-        const fileBase64 = await readFileAsBase64(uri);
+      if (uri) {
+        const base64 = await readFileAsBase64(uri);
 
-        if (fileBase64.length > 0) {
-          console.log(
-            `📡 Sending audio (${(fileBase64.length / 1024).toFixed(1)} KB)`
-          );
-          ws.current.send("data:" + fileBase64);
-
-          // Send stop signal after the data is sent
-          ws.current.send("stop");
-
-          // Clear the recorded file
-          try {
-            await FileSystem.deleteAsync(uri, { idempotent: true });
-          } catch (err) {
-            console.warn("Failed to delete temp audio file:", err);
-          }
+        if (base64.length > 0) {
+          ws.current?.send("data:" + base64);
+          ws.current?.send("stop");
         }
+
+        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
       }
     } catch (err) {
       console.error("Stop recording error:", err);
-      Alert.alert("Error", "Failed to process recording.");
     }
-  };
+  }, []);
 
-  // 🎛️ Toggle
-  const toggleRecording = () => {
-    if (isRecording) stopRecording();
-    else startRecording();
-  };
+  const toggleRecording = useCallback(() => {
+    return isRecording ? stopRecording() : startRecording();
+  }, [isRecording, stopRecording, startRecording]);
 
-  // Format date to a readable format
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
+  // ------------------------------------------------------------------
+  // ENTRY UPDATE HANDLERS
+  // ------------------------------------------------------------------
 
-  const handleUpdateTitle = async (entryId: string, newTitle: string) => {
-    try {
+  const handleUpdateTitle = useCallback(
+    async (entryId: string, newTitle: string) => {
       await updateEntryTitle(entryId, newTitle, token!);
+      await loadEntries();
 
-      // Update the local state to reflect the change
-      setEntries((prevEntries) =>
-        prevEntries.map((entry) =>
-          entry.id === entryId ? { ...entry, title: newTitle } : entry
-        )
-      );
-
-      // Also update the selected entry if it's the one being edited
       if (selectedEntry?.entry_id === entryId) {
-        setSelectedEntry((prev: any) => ({ ...prev, title: newTitle }));
+        setSelectedEntry((p: any) => ({ ...p, title: newTitle }));
       }
-    } catch (error) {
-      console.error("Error updating title:", error);
-      throw error; // This will be caught in the modal
-    }
-  };
+    },
+    [token, loadEntries, selectedEntry]
+  );
 
-  const handleDeleteEntry = async (entryId: string) => {
-    try {
-      setIsDeleting(true);
-      await deleteJournalEntry(entryId, token!);
-      setEntries(prev => prev.filter(e => e.id !== entryId));
+  const handleUpdateEntry = useCallback(
+    async (entryId: string, newEntry: string) => {
       setIsModalVisible(false);
-    } catch (error) {
-      console.error('Error deleting entry:', error);
-      Alert.alert('Error', 'Failed to delete entry');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+      setIsUpdating(true);
+      try {
+        await updateEntry(entryId, newEntry, token!);
+        await loadEntries();
+
+        if (selectedEntry?.entry_id === entryId) {
+          setSelectedEntry((p: any) => ({ ...p, entry: newEntry }));
+        }
+      } catch (err: any) {
+        Alert.alert("Error", err.message);
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [token, loadEntries, selectedEntry]
+  );
+
+  const handleDeleteEntry = useCallback(
+    async (entryId: string) => {
+      try {
+        setIsDeleting(true);
+        await deleteJournalEntry(entryId, token!);
+        setRawEntries((prev: any) => {
+          const copy = { ...prev };
+          delete copy[entryId];
+          return copy;
+        });
+        setIsModalVisible(false);
+      } catch (err: any) {
+        Alert.alert("Error", err.message);
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [token]
+  );
+
+  // ------------------------------------------------------------------
+  // RENDER ENTRY ITEM (memoized)
+  // ------------------------------------------------------------------
+
+  const renderEntry = useCallback(
+    ({ item }: { item: JournalEntryResponse }) => {
+      return (
+        <TouchableOpacity
+          onPress={() => handleEntryPress(item.id!)}
+          className="bg-white/5 p-4 rounded-xl mb-3 w-full"
+        >
+          <Text className="text-white text-lg font-semibold">{item.title}</Text>
+
+          <View className="flex-row justify-between items-start mb-2">
+            <Text className="text-white/80 text-sm">
+              {new Date(item.timestamp).toLocaleString()}
+            </Text>
+
+            {item.tags?.length > 0 && (
+              <View className="flex-row flex-wrap">
+                {item.tags.slice(0, 2).map((tag, i) => (
+                  <View
+                    key={i}
+                    className="bg-purple-600/30 px-2 py-1 rounded-full ml-1"
+                  >
+                    <Text className="text-purple-300 text-xs">{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <Text className="text-white/90">{item.entry.slice(0, 50)}</Text>
+        </TouchableOpacity>
+      );
+    },
+    [handleEntryPress]
+  );
+
+  // ------------------------------------------------------------------
+  // MAIN UI
+  // ------------------------------------------------------------------
 
   return (
     <View className="flex-1 bg-[#3A327B] items-center justify-start">
+      {/* Header */}
       <View className="flex-row gap-4 items-center justify-center w-full mt-16">
-        <TouchableOpacity className="absolute left-5" onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          className="absolute left-5"
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
+
         <Text className="text-white text-3xl font-semibold">Journal</Text>
       </View>
-      {/* Journal Entries */}
-      <ScrollView
-        className="flex-1 w-full mt-6 px-5"
-        contentContainerStyle={{ paddingBottom: 140 }}
-      >
-        {isProcessing && (
-          <View className="flex-1 items-center justify-center py-10 px-8">
-            <Animated.View style={[fadeStyle]}>
-              <Text className="text-white text-xl font-semibold text-center">
-                {processingMessage || "Turning your thoughts into insights..."}
-              </Text>
-            </Animated.View>
-          </View>
-        )}
-        {isLoading && entries.length === 0 ? (
-          <View className="items-center justify-center py-10">
-            <ActivityIndicator size="large" color="#ffffff" />
-          </View>
-        ) : error ? (
-          <View className="items-center justify-center py-10 px-4">
-            <Text className="text-red-400 text-center mb-4">{error}</Text>
-            <TouchableOpacity
-              onPress={loadEntries}
-              className="bg-white/10 px-6 py-3 rounded-lg"
-            >
-              <Text className="text-white">Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : entries.length === 0 ? (
-          <View className="items-center justify-center py-10">
-            <Ionicons name="mic" size={48} color="#ffffff60" />
-            <Text className="text-white/60 text-center mt-4 text-lg">
-              No journal entries yet.
-            </Text>
-            <Text className="text-white/50 text-center mt-1">
-              Tap the mic to record your first entry.
-            </Text>
-          </View>
-        ) : (
-          entries.map((entry, idx) => (
-            <TouchableOpacity
-              onPress={() => handleEntryPress(entry.id!)}
-              key={idx}
-              className="bg-white/5 p-4 rounded-xl mb-3"
-            >
-              <Text className="text-white text-lg font-semibold">
-                {entry.title}
-              </Text>
-              <View className="flex-row justify-between items-start mb-2">
-                <Text className="text-white/80 text-sm">
-                  {formatDate(entry.timestamp || new Date().toISOString())}
-                </Text>
-                {entry.tags && entry.tags.length > 0 && (
-                  <View className="flex-row flex-wrap">
-                    {entry.tags
-                      .slice(0, 2)
-                      .map((tag: string, tagIdx: number) => (
-                        <View
-                          key={`${tag}-${tagIdx}`}
-                          className="bg-purple-600/30 px-2 py-1 rounded-full ml-1"
-                        >
-                          <Text className="text-purple-300 text-xs">{tag}</Text>
-                        </View>
-                      ))}
-                    {entry.tags.length > 2 && (
-                      <View className="bg-gray-600/30 px-2 py-1 rounded-full ml-1">
-                        <Text className="text-gray-300 text-xs">
-                          +{entry.tags.length - 2}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
 
-              <Text className="text-white/90">{entry.entry.slice(0, 50)}</Text>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+      {/* Processing */}
+      {isProcessing && (
+        <Animated.View style={[fadeStyle]} className="mt-8 px-6">
+          <Text className="text-white text-xl text-center">
+            {processingMessage ||
+              "Turning your thoughts into insights..."}
+          </Text>
+        </Animated.View>
+      )}
 
-      {/* Floating Mic Button */}
+      {/* Updating */}
+      {isUpdating && (
+        <Animated.View style={[updateFadeStyle]} className="mt-8 px-6">
+          <Text className="text-white text-xl text-center">
+            {updateMessage || "Updating entry..."}
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* Entries */}
+      {loadingEntries ? (
+        <Animated.View style={[loadingFadeStyle]} className="mt-8 px-6">
+          <Text className="text-white text-xl text-center">
+            {loadingMessage || "Loading entries..."}
+          </Text>
+        </Animated.View>
+      ) : error ? (
+        <View className="items-center justify-center py-10 px-4">
+          <Text className="text-red-400 text-center mb-4">{error}</Text>
+          <TouchableOpacity
+            onPress={loadEntries}
+            className="bg-white/10 px-6 py-3 rounded-lg"
+          >
+            <Text className="text-white">Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : entries.length === 0 ? (
+        <View className="items-center justify-center py-10">
+          <Ionicons name="mic" size={48} color="#ffffff60" />
+          <Text className="text-white/60 text-center mt-4 text-lg">
+            No journal entries yet.
+          </Text>
+          <Text className="text-white/50 text-center mt-1">
+            Tap the mic to record your first entry.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={entries}
+          renderItem={renderEntry}
+          keyExtractor={(item) => item.id!}
+          contentContainerStyle={{ paddingBottom: 150, paddingHorizontal: 20, marginTop: 24 }}
+          style={{ width: '100%' }}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={10}
+          removeClippedSubviews
+        />
+      )}
+
+      {/* Mic Button */}
       <View className="relative items-center w-full py-8">
         <WaveAnimation height={64} width={292} isActive={isRecording} />
         <GradientMicButton isActive={isRecording} onPress={toggleRecording} />
-        <Text className="text-white/80 text-center mt-2 text-sm">
-          {isRecording ? "Listening..." : "Hold to record"}
-        </Text>
       </View>
+
+      {/* Modal */}
       <JournalEntryModal
         visible={isModalVisible}
         entry={selectedEntry}
@@ -488,6 +465,7 @@ const JournalScreen = () => {
         onUpdateTitle={handleUpdateTitle}
         onDelete={handleDeleteEntry}
         isDeleting={isDeleting}
+        onUpdateEntry={handleUpdateEntry}
       />
     </View>
   );
