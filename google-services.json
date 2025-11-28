@@ -1,43 +1,26 @@
 {
   "project_info": {
-    "project_number": "102424279215",
-    "project_id": "zirkl-ai",
-    "storage_bucket": "zirkl-ai.firebasestorage.app"
+    "project_number": "823592697566",
+    "project_id": "zirkl-478511",
+    "storage_bucket": "zirkl-478511.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:102424279215:android:7b1a4a4e4357c049c03c5a",
+        "mobilesdk_app_id": "1:823592697566:android:496ab5856fdc640795cc4f",
         "android_client_info": {
-          "package_name": "com.mettasocial.ZirklAi"
+          "package_name": "com.noustek.ZirklAi"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDpUaNsc4eiGQNGgHgDaRqgRTC2U3cRwAQ"
+          "current_key": "AIzaSyBtuDfwK25CMhgorGKJdL_Q8b5rNXgBB9U"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "102424279215-k9r8snqfs576v0aejtrb9c7puran2hvb.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "102424279215-5s6nmnkdia0arc0nvit3vh7a0064pv3e.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.mettasocial.ZirklAi"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

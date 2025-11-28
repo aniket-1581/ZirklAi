@@ -13,6 +13,7 @@ export interface Message {
   step?: string;
   type?: 'text' | 'flow' | 'option' | 'flow_returning' | 'flow_welcome';
   start_time?: string;
+  contact_name?: string;
 }
 
 export interface Contact {

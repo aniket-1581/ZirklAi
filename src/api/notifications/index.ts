@@ -40,6 +40,8 @@ export interface NotificationItem {
   message: string;
   is_read?: boolean;
   created_at?: string;
+  status?: string;
+  data?: any;
 }
 
 export async function getNotifications(
@@ -93,6 +95,3 @@ export async function nudgeAction(token: string, notificationId: string) {
   if (!res.ok) throw new Error('Failed to fetch notifications');
   return res.json();
 }
-  
-
-

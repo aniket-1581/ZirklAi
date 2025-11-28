@@ -2,9 +2,9 @@ import { createNote, getNotes } from '@/api/notes';
 import { getPhoneContacts } from '@/api/profile';
 import PlanCard from '@/components/PlanCard';
 import { useAuth } from '@/context/AuthContext';
-import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface Contact {
     id: string;
@@ -55,12 +55,6 @@ export default function ChatsScreen() {
     }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-    }, [fetchData])
-  );
-
   const handleChatPress = (contact: any) => {
     router.push(`/(protected)/(tabs)/chats/${contact.id as string}`);
   };
@@ -93,6 +87,10 @@ export default function ChatsScreen() {
     setFilteredContacts(filtered);
   };
 
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center py-20 bg-[#3A327B]">
@@ -104,12 +102,12 @@ export default function ChatsScreen() {
   return (
     <View className='flex-1 bg-[#3A327B]'>
         {/* Header */}
-        {/* <View className='flex-row items-center justify-center px-5 pt-16'>
+        {/* <View className='flex-row items-center justify-center px-6 pt-16'>
           <Text className='text-2xl font-medium text-white'>Chats</Text>
         </View> */}
 
         {/* Section Buttons */}
-        <View className='flex-row px-5 mt-16'>
+        <View className='flex-row px-6 mt-16'>
           <TouchableOpacity
             className={`flex-1 mr-2 py-3 rounded-full ${activeSection === 'chats' ? 'bg-[#DAD8EF]' : 'bg-black/15'}`}
             onPress={() => setActiveSection('chats')}
@@ -131,23 +129,17 @@ export default function ChatsScreen() {
 
         {/* In My Network Section */}
         {activeSection === 'chats' && (
-          <View className='flex-1 px-5 mt-8'>
+          <View className='flex-1 px-6 mt-8'>
             <View className='flex-row items-center justify-start mb-4'>
               <Text className='text-white/70 font-medium text-lg'>Recent Chats</Text>
             </View>
-            <ScrollView className='flex-1' showsVerticalScrollIndicator={false}>
-              {notesContacts.map((item, index) => (
-                <TouchableOpacity onPress={() => handleChatPress(item)} key={index}>
-                  <PlanCard item={item} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <PlanCard notesContacts={notesContacts} handleChatPress={handleChatPress} />
           </View>
         )}
 
         {/* Outside My Network Section */}
         {activeSection === 'mynetwork' && (
-          <View className='px-5 mt-8'>
+          <View className='px-6 mt-8'>
             <View className='flex-row items-center justify-start mb-4'>
               <Text className='text-white/70 font-medium text-lg'>My Contacts</Text>
             </View>

@@ -1,6 +1,6 @@
-import { View, Text, ImageBackground, TouchableOpacity } from "react-native";
-import React from "react";
 import { ImageIcons } from "@/utils/ImageIcons";
+import React from "react";
+import { ImageBackground, Text, TouchableOpacity, View } from "react-native";
 
 interface NetworkIntroProps {
     step: number;
@@ -28,7 +28,7 @@ export default function NetworkIntro({ step, title, description, onClose, quote,
         </Text>
 
         {quote && (
-            <View className="bg-black/15 mt-10 px-5 py-10 w-full rounded-md">
+            <View className="bg-black/15 mt-10 px-6 py-10 w-full rounded-md">
                 <Text className="text-white text-base font-medium text-center">
                     {quote}
                 </Text>
@@ -43,7 +43,7 @@ export default function NetworkIntro({ step, title, description, onClose, quote,
         <TouchableOpacity
           onPress={onClose}
           activeOpacity={0.9}
-          className="bg-[#C7C2ED] rounded-full py-4"
+          className="bg-white rounded-full py-4"
         >
           <Text className="text-[#3A327B] text-center font-semibold text-base">
             Next

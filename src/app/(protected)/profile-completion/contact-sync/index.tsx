@@ -1,11 +1,12 @@
 import { createNote, getNotes } from "@/api/notes";
 import {
-  getPhoneContacts,
-  getStepData,
-  setContactSync,
-  setPhoneContacts,
+    getPhoneContacts,
+    getStepData,
+    setContactSync,
+    setPhoneContacts,
 } from "@/api/profile";
 import ContactSelector from "@/components/ContactSelector";
+import { ProfileCompletionBar } from "@/components/ProfileCompletionBar";
 import SuccessPopup from "@/components/SuccessPopup";
 import { useAuth } from "@/context/AuthContext";
 import { useContactSync } from "@/hooks/useContactSync";
@@ -21,6 +22,7 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 export default function ContactSync() {
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
   const { syncContacts, refreshContacts } = useContactSync();
+  const [completionPercentage, setCompletionPercentage] = useState<number>(0);
   const [stepData, setStepData] = useState<{
     google: boolean;
     linkedin: boolean;
@@ -46,6 +48,8 @@ export default function ContactSync() {
       try {
         const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
+        setCompletionPercentage(res.completion_percentage);
+        console.log(res);
       } catch (err) {
         console.error(err);
       }
@@ -187,6 +191,7 @@ export default function ContactSync() {
 
   return (
     <View className="flex-1 bg-[#3A327B]">
+      <ProfileCompletionBar progress={completionPercentage} />
       <View className="flex-1 pt-24 px-6">
         {/* Header */}
         <Text className="text-white text-2xl font-bold text-center mb-2">
@@ -201,7 +206,7 @@ export default function ContactSync() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 120 }}
         >
-            <View className="flex gap-5 bg-black/15 rounded-md px-5 py-8">
+            <View className="flex gap-5 bg-black/15 rounded-md px-6 py-8">
                 <Text className="text-white text-xl font-normal text-center">
                     Add 5 People who matter {`\n`}most to you
                 </Text>
@@ -254,7 +259,7 @@ export default function ContactSync() {
           <TouchableOpacity
             onPress={handleNext}
             activeOpacity={0.9}
-            className="bg-[#C7C2ED] rounded-full py-4"
+            className="bg-white rounded-full py-4"
           >
             <Text className="text-[#3A327B] text-center font-semibold text-base">
               Next

@@ -1,5 +1,5 @@
-import * as Contacts from "expo-contacts";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Contacts from "expo-contacts";
 
 export interface Contact {
   name: string;
@@ -26,7 +26,7 @@ class ContactSyncService {
       }
       return status === "granted";
     } catch (error) {
-      console.error("Permission request error:", error)
+      console.error("Permission request error:", error);
       return false;
     }
   }
@@ -52,11 +52,11 @@ class ContactSyncService {
           totalContacts: 0,
         };
       }
-  
+
       const result = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       });
-  
+
       if (!result || !Array.isArray(result.data)) {
         return {
           success: false,
@@ -65,17 +65,20 @@ class ContactSyncService {
           totalContacts: 0,
         };
       }
-  
+
       if (result.data.length === 0) {
-        console.warn("[ContactSync] Empty contact list. Samsung One UI 7 workaround may be needed.");
+        console.warn(
+          "[ContactSync] Empty contact list. Samsung One UI 7 workaround may be needed."
+        );
         return {
           success: false,
           contacts: [],
-          error: "No contacts found. Please ensure Contacts app is active and try again.",
+          error:
+            "No contacts found. Please ensure Contacts app is active and try again.",
           totalContacts: 0,
         };
       }
-  
+
       const contacts = result.data
         .filter((contact) => contact.name && contact.phoneNumbers?.length)
         .map((contact) => ({
@@ -83,16 +86,15 @@ class ContactSyncService {
           phoneNumber: contact.phoneNumbers?.[0]?.number || "",
           emails: "",
         }));
-  
+
       await this.storeContacts(contacts);
       await this.updateLastSync();
-  
+
       return {
         success: true,
         contacts,
         totalContacts: contacts.length,
       };
-  
     } catch (error) {
       console.error("[ContactSync] Sync error:", error);
       return {
@@ -103,7 +105,6 @@ class ContactSyncService {
       };
     }
   }
-  
 
   private async storeContacts(contacts: Contact[]): Promise<void> {
     await AsyncStorage.setItem(this.CONTACTS_KEY, JSON.stringify(contacts));

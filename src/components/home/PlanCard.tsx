@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,10 @@ import {
 } from "react-native";
 import { getGender } from "gender-detection-from-name";
 import { ImageIcons } from "@/utils/ImageIcons";
-import { useRouter } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
 import { Feather } from "@expo/vector-icons";
 import { formatUtcToIstTime } from "@/utils/date";
 import * as Clipboard from "expo-clipboard";
+import { useRoundRobinAssignment } from "@/hooks/useRoundRobinAssignment";
 
 interface PlanCardProps {
   item: any;
@@ -26,24 +25,35 @@ export default function PlanCard({ item }: PlanCardProps) {
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  const gender = getGender(item.contact_name || item.title.split('for ')[1], "en");
-  const femaleUserIcon = [
+  const gender = getGender(
+    item.type === "followup" ? item.contact_name?.split(" ")[0] : item.contact_name?.split(" ")[0],
+    "en"
+  );
+  const femalePool = [
     ImageIcons.GirlImage,
     ImageIcons.GirlImage2,
     ImageIcons.GirlImage3,
     ImageIcons.GirlImage4,
+    ImageIcons.WomanImage,
   ];
-  const maleUserIcon = [
+  
+  const malePool = [
     ImageIcons.BoyImage,
     ImageIcons.BoyImage2,
     ImageIcons.BoyImage3,
+    ImageIcons.MenImage,
   ];
-  const randomFemaleUserIcon =
-    femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)];
-  const randomMaleUserIcon =
-    maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
+  
+  const femaleRR = useRoundRobinAssignment(femalePool, "calendar_avatar_female");
+  const maleRR = useRoundRobinAssignment(malePool, "calendar_avatar_male");
   const randomUserIcon =
-    gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon;
+    gender === "male" ? maleRR.assign(item.id) : femaleRR.assign(item.id); 
+  
+  useEffect(() => {
+    femaleRR.load();
+    maleRR.load();
+  }, []);
+  
   return (
     <>
       {Platform.OS === "android" && <StatusBar hidden />}
@@ -61,7 +71,7 @@ export default function PlanCard({ item }: PlanCardProps) {
           />
           <View className="flex-col">
             <Text className="text-white font-semibold text-base mb-1">
-              {item.contact_name || item.title.split('for ')[1]}
+              {item.contact_name?.includes('for ') ? item.contact_name.split('for ')[1] : item.contact_name}
             </Text>
             <View className="flex-row flex-wrap mt-2">
               <View className="bg-[#655BC5] rounded-lg px-2 py-1">
@@ -72,6 +82,13 @@ export default function PlanCard({ item }: PlanCardProps) {
                 )}
               </View>
             </View>
+            <Text className="text-white/80 text-sm mt-2">
+              {
+                item.type === "nudge" ? 
+                  `${new Date(item.created_at).toDateString()} ${formatUtcToIstTime(item.created_at)}` : 
+                  `${new Date(item.startDate).toDateString()} ${formatUtcToIstTime(item.startDate)}`
+              }
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -112,7 +129,7 @@ export default function PlanCard({ item }: PlanCardProps) {
             )}
 
             {/* FOLLOWUP TYPE */}
-            {selectedItem && selectedItem.type === "followup" && (
+            {selectedItem && selectedItem?.type === "followup" && (
               <ScrollView className="max-h-[70vh]">
                 <View className="mb-4">
                   <Text className="text-white mb-2">
@@ -264,7 +281,7 @@ export default function PlanCard({ item }: PlanCardProps) {
             )}
 
             {/* NUDGE TYPE */}
-            {selectedItem && selectedItem.type === "nudge" && (
+            {selectedItem && selectedItem?.type === "nudge" && (
               <View className="mb-4">
                 <Text className="text-white mb-2">
                   <Text className="font-semibold">Contact:</Text>{" "}

@@ -25,8 +25,8 @@ export const useNudges = () => {
     setError(null);
 
     try {
-      const data = await getNudges(token);
-      setNudges(data.nudges || []);
+      const data = await getNudges(token!);
+      setNudges(data.nudges);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch nudges');
       setNudges([]);

@@ -7,38 +7,33 @@ import {
   postNoteChatHistory,
 } from "@/api/chat";
 import { getNoteById } from "@/api/notes";
+import ChatInput from "@/components/ChatInput";
 import KeyboardLayout from "@/components/KeyboardAvoidingLayout";
 import TypingIndicator from "@/components/TypingIndicator";
 import { useAuth } from "@/context/AuthContext";
+import { useRoundRobinAssignment } from "@/hooks/useRoundRobinAssignment";
 import { ImageIcons } from "@/utils/ImageIcons";
-import { formatUtcToIstTime } from "@/utils/date";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter, useFocusEffect } from "expo-router";
 import { getGender } from "gender-detection-from-name";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FlatList,
   Image,
   Keyboard,
   ScrollView,
+  Share,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-
-const femaleUserIcon = [
-  ImageIcons.GirlImage,
-  ImageIcons.GirlImage2,
-  ImageIcons.GirlImage3,
-  ImageIcons.GirlImage4,
-];
-const maleUserIcon = [
-  ImageIcons.BoyImage,
-  ImageIcons.BoyImage2,
-  ImageIcons.BoyImage3,
-];
 
 export default function ChatScreen() {
   const { id, draftMessage } = useLocalSearchParams<{
@@ -51,7 +46,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const flatListRef = useRef<FlatList | null>(null);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [note, setNote] = useState<any>(null);
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>(
     {}
@@ -60,18 +55,29 @@ export default function ChatScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  const randomFemaleUserIcon = useMemo(
-    () => femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)],
-    []
-  );
-  const randomMaleUserIcon = useMemo(
-    () => maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)],
-    []
-  );
-  const gender = useMemo(
+  const chatGender = useMemo(
     () => getGender(note?.contact_name?.split(" ")[0], "en"),
     [note?.contact_name]
   );
+  const gender = getGender(user?.full_name.split(" ")[0] as string, "en");
+
+  const femalePool = [
+    ImageIcons.GirlImage,
+    ImageIcons.GirlImage2,
+    ImageIcons.GirlImage3,
+    ImageIcons.GirlImage4,
+  ];
+  
+  const malePool = [
+    ImageIcons.BoyImage,
+    ImageIcons.BoyImage2,
+    ImageIcons.BoyImage3,
+    ImageIcons.MenImage,
+  ];
+  
+  const femaleRR = useRoundRobinAssignment(femalePool, "chat_avatar_female");
+  const maleRR = useRoundRobinAssignment(malePool, "chat_avatar_male");
+  const randomUserIcon = chatGender === 'male' ? maleRR.assign(id as string) : femaleRR.assign(id as string);
 
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
@@ -79,6 +85,11 @@ export default function ChatScreen() {
     setTimeout(() => {
       setCopiedStates((prev) => ({ ...prev, [key]: false }));
     }, 3000);
+  };
+
+  // Share handler
+  const handleShare = (text: string) => {
+    Share.share({ message: text });
   };
 
   const renderFormattedText = (text: string) => {
@@ -165,25 +176,31 @@ export default function ChatScreen() {
     fetchChat();
   }, [token, id]);
 
-  // Keyboard handling
+  // Keyboard events
   useEffect(() => {
-    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
-      setIsKeyboardVisible(true);
-      setTimeout(() => {
-        if (flatListRef.current) {
-          flatListRef.current.scrollToEnd({ animated: true });
-        }
-      }, 100);
-    });
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      setIsKeyboardVisible(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
+      const show = Keyboard.addListener("keyboardDidShow", () =>
+        setIsKeyboardVisible(true)
+      );
+      const hide = Keyboard.addListener("keyboardDidHide", () =>
+        setIsKeyboardVisible(false)
+      );
+      return () => {
+        show.remove();
+        hide.remove();
+      };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({
+        offset: 0, // inverted list => 0 means bottom
+        animated: false,
+        });
+      });
+      return () => {};
+    }, [])
+  );
 
   const handleSend = async () => {
     Keyboard.dismiss();
@@ -235,12 +252,17 @@ export default function ChatScreen() {
     }
   };
 
-
   useEffect(() => {
     if (draftMessage !== "") {
-      handleSend()
+      handleSend();
     }
-  }, [draftMessage])
+  }, [draftMessage]);
+
+  // 🟣 CHATGPT/WHATSAPP STYLE LIST = reversed + inverted
+  const reversedMessages = useMemo(
+    () => [...messages].reverse(),
+    [messages]
+  );
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const isUser = item.role === "user";
@@ -255,8 +277,8 @@ export default function ChatScreen() {
       let suggestionMessages: string[] = [];
       let adviceOrTips: string[] = [];
 
-      const adviceSplitRegex = /\n+(?=For |Coach Tip:)/g;
-      const contentParts = content?.split(adviceSplitRegex);
+      const coachTipRegex = item.type === "advice" ? /(?=\n\n)/g : /\n+(?=Coach Tip:)/g;
+      const contentParts = content?.split(coachTipRegex);
       let mainContent = contentParts[0];
       adviceOrTips = contentParts.slice(1).map((p) => p.trim());
 
@@ -285,14 +307,24 @@ export default function ChatScreen() {
             <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
             <View className="flex-col items-start mb-4">
               {introText && !!introText.trim() && (
-                <View className="w-80 flex-row items-center mr-4 mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4">
+                <View className="w-80 flex-row items-center mr-4 mb-4 bg-[#5248A0] border border-white/10  rounded-2xl px-6 py-4">
                   {renderFormattedText(introText)}
                   {/* <Text className="text-black/15 text-xs mt-2 text-right">
                   {time12}
                 </Text> */}
                 </View>
               )}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingRight: 16, // Add side padding to prevent clipping
+                  columnGap: 10, // Consistent gap between cards
+                }}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                overScrollMode="never"
+              >
                 {suggestionMessages.map((msg: string, idx: number) => {
                   const copyKey = `msg-${index}-${idx}`;
                   const isCopied = copiedStates[copyKey];
@@ -300,30 +332,43 @@ export default function ChatScreen() {
                   return (
                     <View
                       key={idx}
-                      className="w-80 flex-row items-start mr-4 mb-4 border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4"
+                      style={{
+                        marginRight:
+                          idx === suggestionMessages.length - 1 ? 36 : 0, // right padding for last card
+                      }}
+                      className="w-80 flex-row items-start mb-4 bg-[#5248A0] border border-white/10 rounded-2xl px-6 py-4"
                     >
-                      <View>
                         <Text className={`text-white text-base mb-3`}>
                           {renderFormattedText(trimmedMsg)}
                         </Text>
-                        {/* <Text className="text-black text-xs mt-2 text-right">
-                      {time12}
-                    </Text> */}
                         {(trimmedMsg.includes("Message 1:") ||
                           trimmedMsg.includes("Message 2:") ||
                           trimmedMsg.includes("Message 3:")) && (
-                          <TouchableOpacity
-                            className="absolute right-2 top-2"
-                            onPress={() => handleCopy(trimmedMsg, copyKey)}
-                          >
-                            <MaterialIcons
-                              name={isCopied ? "check" : "content-copy"}
-                              size={18}
-                              color={isCopied ? "#10B981" : "#9CA3AF"}
-                            />
-                          </TouchableOpacity>
+                          <View className="absolute right-2 top-2 flex-row gap-4">
+                            <TouchableOpacity
+                              onPress={() => handleCopy(trimmedMsg, copyKey)}
+                            >
+                              <MaterialIcons
+                                name={isCopied ? "check" : "content-copy"}
+                                size={18}
+                                color={isCopied ? "#10B981" : "#9CA3AF"}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleShare(
+                                  trimmedMsg.split(`Message ${idx + 1}:`)[1]
+                                )
+                              }
+                            >
+                              <MaterialIcons
+                                name="share"
+                                size={18}
+                                color="#9CA3AF"
+                              />
+                            </TouchableOpacity>
+                          </View>
                         )}
-                      </View>
                     </View>
                   );
                 })}
@@ -333,9 +378,9 @@ export default function ChatScreen() {
                 return (
                   <View
                     key={`tip-${idx}`}
-                    className="w-full flex-row items-start mb-2 ml-12"
+                    className="w-full flex-row items-start mb-4"
                   >
-                    <View className="w-80 flex-row items-start border bg-black/15 border-white rounded-xl px-5 py-3">
+                    <View className="w-80 flex-row items-start bg-black/15 border border-white/10 rounded-xl px-6 py-3">
                       <View style={{ flex: 1 }}>
                         {renderFormattedText(trimmedTip)}
                       </View>
@@ -358,9 +403,7 @@ export default function ChatScreen() {
       >
         {isUser ? (
           <Image
-            source={
-              gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
-            }
+            source={gender === "male" ? ImageIcons.MaleAvatar : ImageIcons.FemaleAvatar}
             className="w-9 h-9 rounded-full ml-2"
           />
         ) : (
@@ -370,7 +413,7 @@ export default function ChatScreen() {
           />
         )}
         <View
-          className={`w-80 ${isUser ? "bg-[#C6BFFF]/10" : "bg-black/15 border border-white"} rounded-xl px-5 py-3`}
+          className={`w-80 ${isUser ? "bg-[#C6BFFF]/10" : "bg-[#5248A0] border border-white/10 "} rounded-xl px-6 py-3`}
         >
           <Text className={`text-white text-base`}>{item.content}</Text>
           {/* <Text className="text-white text-xs text-right">{time12}</Text> */}
@@ -387,24 +430,20 @@ export default function ChatScreen() {
   }
 
   const handleGoBack = () => {
-    router.push('/(protected)/(tabs)/chats');
-  }
+    router.push("/(protected)/(tabs)/chats");
+  };
+
   return (
     <View className="flex-1 bg-[#3A327B]">
       <KeyboardLayout>
         {/* Header */}
-        <View className="flex-row items-center px-5 py-4">
-          <TouchableOpacity
-            className="mr-4"
-            onPress={handleGoBack}
-          >
+        <View className="flex-row items-center px-6 py-4">
+          <TouchableOpacity className="mr-4" onPress={handleGoBack}>
             <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <View className="flex-row items-center">
             <Image
-              source={
-                gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
-              }
+              source={randomUserIcon}
               className="w-10 h-10 rounded-full mr-2"
             />
             <Text className="text-white text-[22px] font-bold">
@@ -416,28 +455,27 @@ export default function ChatScreen() {
         <View className="flex-1 mx-5">
           <FlatList
             ref={flatListRef}
-            data={messages}
+            data={reversedMessages}
+            inverted
+            keyExtractor={(_, i) => i.toString()}
             renderItem={renderMessage}
-            keyExtractor={(_, idx) => idx.toString()}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{
               paddingVertical: 26,
-              flexGrow: 1,
               paddingBottom: isKeyboardVisible ? 100 : 26,
             }}
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() =>
-              (flatListRef.current as any)?.scrollToEnd({ animated: true })
-            }
-            onLayout={() =>
-              (flatListRef.current as any)?.scrollToEnd({ animated: true })
-            }
+            initialNumToRender={12}
+            windowSize={10}
+            removeClippedSubviews={true}
           />
+
           <TypingIndicator isWaitingForResponse={isWaitingForResponse} />
           {loadingMessages.length > 0 && isWaitingForResponse && (
             <View>
               {loadingMessages.map((msg, idx) => (
                 <View key={`loading-${idx}`} className="mb-2 items-start">
-                  <View className="bg-white border border-gray-200 rounded-lg px-4 py-2">
+                  <View className="bg-white border border-white/10  rounded-lg px-4 py-2">
                     <Text className="text-sm text-gray-600">{msg}</Text>
                   </View>
                 </View>
@@ -445,33 +483,12 @@ export default function ChatScreen() {
             </View>
           )}
         </View>
-        <View className="flex-row items-center bg-white rounded-full mx-4 mb-4 px-4 py-2 shadow-sm shadow-black/20">
-          {/* Plus Icon */}
-          <TouchableOpacity className="mr-2">
-            <MaterialIcons name="add" size={22} color="#808080" />
-          </TouchableOpacity>
-
-          {/* Input Field */}
-          <TextInput
-            className="flex-1 text-[#333] text-base h-10"
-            placeholder="Type here..."
-            placeholderTextColor="#888"
-            value={message}
-            onChangeText={setMessage}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-          />
-
-          {/* Send Icon */}
-          <TouchableOpacity onPress={handleSend}>
-            <MaterialIcons name="send" size={24} color="#60646D" />
-          </TouchableOpacity>
-
-          {/* Mic Icon */}
-          <TouchableOpacity className="ml-2">
-            <MaterialIcons name="mic" size={22} color="#60646D" />
-          </TouchableOpacity>
-        </View>
+        <ChatInput
+          userInput={message}
+          setUserInput={setMessage}
+          onTextSubmit={() => handleSend()}
+          isWaitingForResponse={isWaitingForResponse}
+        />
       </KeyboardLayout>
     </View>
   );

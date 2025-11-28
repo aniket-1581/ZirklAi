@@ -1,5 +1,6 @@
 import { getStepData, setUserEngagementPlan } from "@/api/profile";
 import NetworkIntro from "@/components/profile/NetworkIntro";
+import { ProfileCompletionBar } from "@/components/ProfileCompletionBar";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
@@ -10,12 +11,15 @@ export default function EngagementPlan() {
   const [stepData, setStepData] = useState<any>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showPopUp, setShowPopUp] = useState<boolean>(true);
+  const [completionPercentage, setCompletionPercentage] = useState<number>(0);
 
   useEffect(() => {
     const fetchStepData = async () => {
       try {
         const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
+        setCompletionPercentage(res.completion_percentage);
+        console.log(res);
       } catch (err) {
         console.error(err);
       }
@@ -49,6 +53,7 @@ export default function EngagementPlan() {
     />
   ) : (
     <View className="flex-1 bg-[#3A327B]">
+      <ProfileCompletionBar progress={completionPercentage} />
       <View className="flex-1 pt-24 px-6">
         {/* Header */}
         <Text className="text-white text-2xl font-bold text-center mb-4">
@@ -66,7 +71,7 @@ export default function EngagementPlan() {
                 key={item.key}
                 onPress={() => setSelected(item.label)}
                 activeOpacity={0.8}
-                className={`flex-row items-center justify-between bg-black/15 rounded-xl py-[14px] px-5 border border-white/10`}
+                className={`flex-row items-center justify-between bg-black/15 rounded-xl py-[14px] px-6 border border-white/10`}
               >
                 <View className="flex-col">
                   <Text className="text-white text-base font-medium">
@@ -91,7 +96,7 @@ export default function EngagementPlan() {
           <TouchableOpacity
             onPress={handleNext}
             activeOpacity={0.9}
-            className="bg-[#C7C2ED] rounded-full py-4"
+            className="bg-white rounded-full py-4"
           >
             <Text className="text-[#3A327B] text-center font-semibold text-base">
               Next

@@ -9,6 +9,7 @@ export interface CalendarEventItem {
   timeZone: string;
   location?: string;
   notes?: string;
+  contact_name?: string;
 }
 
 export interface CalendarEventCreate {
@@ -22,6 +23,7 @@ export interface CalendarEventResponse {
   timeZone: string;
   location?: string;
   notes?: string;
+  contact_name?: string;
 }
 
 export interface CalendarEventListResponse {
@@ -125,5 +127,16 @@ export async function syncCalendarEvents(
     body: JSON.stringify(syncRequest),
   });
   if (!res.ok) throw new Error('Failed to sync calendar events');
+  return res.json();
+}
+
+export async function getCalendarEventIds(token: string): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/calendar-events-ids`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+    },
+  });
+  if (!res.ok) throw new Error('Failed to fetch calendar event ids');
   return res.json();
 }

@@ -37,16 +37,12 @@ export function getGreetingByIST() {
 
 export function getGrowthMessageOnce() {
   const growthMessages = [
-    "Let's nurture your network today",
-    "Ready to strengthen your connections?",
-    "Let's build meaningful relationships today",
-    "Your network is your growth—let's expand it",
-    "Small interactions build powerful networks",
-    "Today is a great day to connect intentionally",
-    "Grow your relationships, grow your success",
-    "Let's create opportunities through connection",
-    "Your next big opportunity may start with one message",
-    "Let's reconnect with someone who matters"
+    "Let's nurture your network today.",
+    "Your network is your net worth - Let's expand it!",
+    "Your network is your superpower — activate it!",
+    "Connect with purpose, grow with confidence.",
+    "Build connections, build opportunities.",
+    "Strong networks create strong futures."
   ];
 
   const randomIndex = Math.floor(Math.random() * growthMessages.length);

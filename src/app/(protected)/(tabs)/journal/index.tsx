@@ -3,17 +3,16 @@ import {
   deleteJournalEntry,
   getEntries,
   getEntry,
-  JournalEntryResponse,
-  updateEntryTitle,
   updateEntry,
+  UpdateEntryRequest,
 } from "@/api/journal";
 import WaveAnimation from "@/components/WaveAnimation";
 import GradientMicButton from "@/components/journal/GradientMicButton";
 import JournalEntryModal from "@/components/journal/JournalEntryModal";
 import { useAuth } from "@/context/AuthContext";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import { useNavigation } from "expo-router";
 import React, {
   useCallback,
@@ -22,14 +21,7 @@ import React, {
   useState,
   useMemo,
 } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useProcessingMessages } from "@/hooks/useProcessingMessages";
 
@@ -70,19 +62,46 @@ const JournalScreen = () => {
     "Highlighting potential follow-ups and next steps.",
     "Turning your reflection into actionable insights.",
   ]);
-  const { processingMessage: loadingMessage, fadeStyle: loadingFadeStyle } = useProcessingMessages(loadingEntries, [
-    "Loading entries…",
-    "Processing entries…",
-    "Sorting entries…",
-    "Loading more entries…",
-    "Processing more entries…",
-    "Sorting more entries…",
-  ]);
-  const { processingMessage: updateMessage, fadeStyle: updateFadeStyle } = useProcessingMessages(isUpdating, [
-    "Updating entry…",
-    "Processing entry…",
-    "Sorting entry…"
-  ]);
+  const { processingMessage: loadingMessage, fadeStyle: loadingFadeStyle } =
+    useProcessingMessages(loadingEntries, [
+      "Loading entries…",
+      "Processing entries…",
+      "Sorting entries…",
+      "Loading more entries…",
+      "Processing more entries…",
+      "Sorting more entries…",
+    ]);
+  const { processingMessage: updateMessage, fadeStyle: updateFadeStyle } =
+    useProcessingMessages(isUpdating, [
+      "Updating entry…",
+      "Processing entry…",
+      "Sorting entry…",
+    ]);
+    const [micAmplitude, setMicAmplitude] = useState(0);
+
+    useEffect(() => {
+      let interval: any;
+
+      if (isRecording) {
+        interval = setInterval(async () => {
+          const status: any = await recordingRef.current?.getStatusAsync();
+          if (!status) return;
+
+          if (typeof status.metering === "number") {
+            const linear = Math.pow(10, status.metering / 20); 
+            setMicAmplitude(Math.min(1, linear * 250));   // Boost slightly
+          }
+        }, 80);
+      } else {
+        interval = setInterval(() => {
+          setMicAmplitude((v) => Math.max(0, v * 0.8));
+        }, 100);
+      }
+
+      return () => clearInterval(interval);
+    }, [isRecording]);
+
+
 
   // ------------------------------------------------------------------
   // LOAD ENTRIES
@@ -113,22 +132,19 @@ const JournalScreen = () => {
       }))
       .sort(
         (a, b) =>
-          new Date(b.timestamp).getTime() -
-          new Date(a.timestamp).getTime()
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
   }, [rawEntries]);
-
-
 
   // ------------------------------------------------------------------
   // LOAD SINGLE ENTRY (for modal)
   // ------------------------------------------------------------------
 
   const handleEntryPress = useCallback(
-    async (entryId: string) => {
+    async (entryId: string, isEditing?: boolean) => {
       try {
         const entryData = await getEntry(entryId, token!);
-        setSelectedEntry(entryData);
+        setSelectedEntry({...entryData, isEditing});
         setIsModalVisible(true);
       } catch (error) {
         console.error("Error fetching entry:", error);
@@ -218,13 +234,14 @@ const JournalScreen = () => {
       });
 
       const { recording } = await Audio.Recording.createAsync({
+        isMeteringEnabled: true,
         android: {
           extension: ".wav",
           outputFormat: Audio.AndroidOutputFormat.DEFAULT,
           audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
           sampleRate: 16000,
           numberOfChannels: 1,
-          bitRate: 128000,
+          bitRate: 128000
         },
         ios: {
           extension: ".wav",
@@ -235,11 +252,11 @@ const JournalScreen = () => {
           bitRate: 128000,
           linearPCMBitDepth: 16,
           linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
+          linearPCMIsFloat: false
         },
         web: {
           mimeType: "audio/wav",
-        }
+        },
       });
 
       recordingRef.current = recording;
@@ -278,32 +295,17 @@ const JournalScreen = () => {
     return isRecording ? stopRecording() : startRecording();
   }, [isRecording, stopRecording, startRecording]);
 
-  // ------------------------------------------------------------------
-  // ENTRY UPDATE HANDLERS
-  // ------------------------------------------------------------------
-
-  const handleUpdateTitle = useCallback(
-    async (entryId: string, newTitle: string) => {
-      await updateEntryTitle(entryId, newTitle, token!);
-      await loadEntries();
-
-      if (selectedEntry?.entry_id === entryId) {
-        setSelectedEntry((p: any) => ({ ...p, title: newTitle }));
-      }
-    },
-    [token, loadEntries, selectedEntry]
-  );
 
   const handleUpdateEntry = useCallback(
-    async (entryId: string, newEntry: string) => {
+    async (entryId: string, newEntry: UpdateEntryRequest) => {
       setIsModalVisible(false);
       setIsUpdating(true);
       try {
-        await updateEntry(entryId, newEntry, token!);
+        await updateEntry(newEntry, token!, entryId);
         await loadEntries();
 
         if (selectedEntry?.entry_id === entryId) {
-          setSelectedEntry((p: any) => ({ ...p, entry: newEntry }));
+          setSelectedEntry((p: any) => ({ ...p, ...newEntry }));
         }
       } catch (err: any) {
         Alert.alert("Error", err.message);
@@ -334,44 +336,158 @@ const JournalScreen = () => {
     [token]
   );
 
+  const handleDelete = async (entryId: string) => {
+      Alert.alert("Delete Entry", "Are you sure you want to delete this entry?", [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await handleDeleteEntry(entryId);
+            } catch (error) {
+              console.error("Failed to delete entry:", error);
+              Alert.alert("Error", "Failed to delete entry");
+            }
+          },
+        },
+      ]);
+    };
+
   // ------------------------------------------------------------------
   // RENDER ENTRY ITEM (memoized)
   // ------------------------------------------------------------------
 
   const renderEntry = useCallback(
-    ({ item }: { item: JournalEntryResponse }) => {
+    ({ item }: { item: any }) => {
+      const formattedDate = new Date(item.timestamp).toLocaleDateString(
+        "en-US",
+        {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }
+      );
+
+      const monthsAgo = Math.floor(
+        (Date.now() - new Date(item.timestamp).getTime()) /
+          (1000 * 60 * 60 * 24 * 30)
+      );
+
       return (
         <TouchableOpacity
-          onPress={() => handleEntryPress(item.id!)}
+          onPress={() => handleEntryPress(item.entry_id)}
+          activeOpacity={0.9}
           className="bg-white/5 p-4 rounded-xl mb-3 w-full"
         >
-          <Text className="text-white text-lg font-semibold">{item.title}</Text>
+          <View className="absolute top-3 right-3 flex-row space-x-2 z-20">
+            {/* Edit */}
+            <TouchableOpacity
+              className="p-2 bg-white/7 rounded-md"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => handleEntryPress(item.entry_id, true)} 
+            >
+              <Feather name="edit-2" size={18} color="#E9D5FF" />
+            </TouchableOpacity>
 
-          <View className="flex-row justify-between items-start mb-2">
-            <Text className="text-white/80 text-sm">
-              {new Date(item.timestamp).toLocaleString()}
+            {/* Delete */}
+            <TouchableOpacity
+              onPress={() => handleDelete(item.entry_id)}
+              className="p-2 bg-white/7 rounded-md"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialIcons name="delete-outline" size={20} color="#FF7777" />
+            </TouchableOpacity>
+          </View>
+          {/* Title */}
+          <View className="flex-row items-center">
+            <Text className="text-white text-lg font-bold mr-2" numberOfLines={3}>
+              {item.title || "Untitled"}
             </Text>
-
-            {item.tags?.length > 0 && (
-              <View className="flex-row flex-wrap">
-                {item.tags.slice(0, 2).map((tag, i) => (
-                  <View
-                    key={i}
-                    className="bg-purple-600/30 px-2 py-1 rounded-full ml-1"
-                  >
-                    <Text className="text-purple-300 text-xs">{tag}</Text>
-                  </View>
-                ))}
+          </View>
+          {/* Contact Badge */}
+          <View className="flex-1 items-start">
+            {item.contact_name && (
+              <View className="rounded-md bg-[#1b7723] px-3 py-1">
+                <Text className="text-white text-sm font-semibold">
+                  {item.contact_name?.toLowerCase()}
+                </Text>
               </View>
             )}
           </View>
 
-          <Text className="text-white/90">{item.entry.slice(0, 50)}</Text>
+          {/* Date + months ago */}
+          <View className="flex-row items-center mt-2">
+            <MaterialIcons name="calendar-today" size={16} color="#E5E7EB" />
+            <Text className="text-gray-200 text-sm ml-2">{formattedDate}</Text>
+            <Text className="text-gray-200 mx-2">•</Text>
+            <Text className="text-gray-200 text-sm">
+              {monthsAgo} months ago
+            </Text>
+          </View>
+
+          {/* Entry text */}
+          <Text className="text-white mt-3 leading-6" numberOfLines={3}>
+            {item.entry.trim()}
+          </Text>
+
+          {/* Tags */}
+          {item.tags?.length > 0 && (
+            <View className="flex-row flex-wrap mt-4">
+              {item.tags.slice(0, 3).map((tag: string, index: number) => (
+                <View
+                  key={index}
+                  className="bg-purple-700 px-3 py-1 rounded-full mr-2 mb-2"
+                >
+                  <Text className="text-white text-xs font-semibold">
+                    #{tag}
+                  </Text>
+                </View>
+              ))}
+
+              {item.tags.length > 3 && (
+                <View className="bg-white/20 px-3 py-1 rounded-full mb-2">
+                  <Text className="text-white text-xs font-semibold">
+                    +{item.tags.length - 3}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* AI Insight (fsm_summary) */}
+          {item.fsm_summary && (
+            <View className="bg-white/10 rounded-xl p-4 mt-4 flex-row gap-2">
+              <MaterialIcons name="auto-awesome" size={16} color="#E5E7EB" />
+              <Text className="text-indigo-200 text-sm">
+                {item.suggested_actions[0]?.reason || item.fsm_summary}
+              </Text>
+            </View>
+          )}
+
+          {/* Suggested Actions */}
+          {item.suggested_actions?.length > 0 && (
+            <View className="mt-4">
+              <View className="bg-[#db8439] px-4 py-2 rounded-lg self-start">
+                <Text className="text-white font-semibold">
+                  {item.suggested_actions.length} action items
+                </Text>
+              </View>
+            </View>
+          )}
         </TouchableOpacity>
       );
     },
     [handleEntryPress]
   );
+
+  const handleClose = () => {
+    setSelectedEntry(null);
+    setIsModalVisible(false);
+  }
 
   // ------------------------------------------------------------------
   // MAIN UI
@@ -395,8 +511,7 @@ const JournalScreen = () => {
       {isProcessing && (
         <Animated.View style={[fadeStyle]} className="mt-8 px-6">
           <Text className="text-white text-xl text-center">
-            {processingMessage ||
-              "Turning your thoughts into insights..."}
+            {processingMessage || "Turning your thoughts into insights..."}
           </Text>
         </Animated.View>
       )}
@@ -442,8 +557,12 @@ const JournalScreen = () => {
           data={entries}
           renderItem={renderEntry}
           keyExtractor={(item) => item.id!}
-          contentContainerStyle={{ paddingBottom: 150, paddingHorizontal: 20, marginTop: 24 }}
-          style={{ width: '100%' }}
+          contentContainerStyle={{
+            paddingBottom: 150,
+            paddingHorizontal: 24,
+            marginTop: 24,
+          }}
+          style={{ width: "100%" }}
           initialNumToRender={8}
           maxToRenderPerBatch={6}
           windowSize={10}
@@ -452,8 +571,12 @@ const JournalScreen = () => {
       )}
 
       {/* Mic Button */}
-      <View className="relative items-center w-full py-8">
-        <WaveAnimation height={64} width={292} isActive={isRecording} />
+      <View className="relative bottom-0 items-center w-full py-8">
+        <WaveAnimation
+          amplitude={micAmplitude}
+          height={64}
+          width={310}
+        />
         <GradientMicButton isActive={isRecording} onPress={toggleRecording} />
       </View>
 
@@ -461,11 +584,8 @@ const JournalScreen = () => {
       <JournalEntryModal
         visible={isModalVisible}
         entry={selectedEntry}
-        onClose={() => setIsModalVisible(false)}
-        onUpdateTitle={handleUpdateTitle}
-        onDelete={handleDeleteEntry}
-        isDeleting={isDeleting}
-        onUpdateEntry={handleUpdateEntry}
+        onClose={handleClose}
+        handleUpdateEntry={handleUpdateEntry}
       />
     </View>
   );

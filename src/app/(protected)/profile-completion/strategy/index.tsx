@@ -1,5 +1,6 @@
 import { getStepData, setUserStrategy } from "@/api/profile";
 import NetworkIntro from "@/components/profile/NetworkIntro";
+import { ProfileCompletionBar } from "@/components/ProfileCompletionBar";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
@@ -10,12 +11,14 @@ export default function Strategy() {
   const [stepData, setStepData] = useState<any>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showPopUp, setShowPopUp] = useState<boolean>(true);
+  const [completionPercentage, setCompletionPercentage] = useState<number>(0);
 
   useEffect(() => {
     const fetchStepData = async () => {
       try {
         const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
+        setCompletionPercentage(res.completion_percentage);
       } catch (err) {
         console.error(err);
       }
@@ -53,13 +56,14 @@ export default function Strategy() {
     />
   ) : (
     <View className="flex-1 bg-[#3A327B]">
+      <ProfileCompletionBar progress={completionPercentage} />
         <View className="flex-1 pt-24 px-6">
             {/* Header */}
             <Text className="text-white text-2xl font-bold text-center mb-4">
                 Choose your Technique
             </Text>
             <Text className="w-[80%] mx-auto text-[#C7C2ED] text-base text-center mb-3">
-                Our AI will guide you through the approach the best fits your style.
+                Our AI will guide you through the approach that best fits your style.
             </Text>
 
             {/* Options */}
@@ -69,7 +73,7 @@ export default function Strategy() {
                     key={item.key}
                     onPress={() => setSelected(item.label)}
                     activeOpacity={0.8}
-                    className={`flex-row bg-black/15 rounded-xl px-5 items-center justify-between py-[14px] border border-white/10`}
+                    className={`flex-row bg-black/15 rounded-xl px-6 items-center justify-between py-[14px] border border-white/10`}
                 >
                     <View className="flex-row items-center">
                     <View className="bg-black/20 p-3 rounded-full mr-4">
@@ -93,7 +97,7 @@ export default function Strategy() {
           <TouchableOpacity
             onPress={handleNext}
             activeOpacity={0.9}
-            className="bg-[#C7C2ED] rounded-full py-4"
+            className="bg-white rounded-full py-4"
           >
             <Text className="text-[#3A327B] text-center font-semibold text-base">
               Next

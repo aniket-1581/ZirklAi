@@ -8,7 +8,7 @@ export default function TabsLayout() {
     return (
         <Tabs
             screenOptions={({ route }) => {
-                const hiddenRoute = route.name === 'chats/[id]/index' || route.name === 'global-chat/index' || route.name === 'journal/index';
+                const hiddenRoute = route.name === 'chats/[id]/index' || route.name === 'global-chat/index' || route.name === 'journal/index' || route.name === 'notifications/index';
                 return {
                     headerShown: false,
                     tabBarStyle: hiddenRoute ? { display: 'none' } : {

@@ -1,6 +1,7 @@
 import { getStepData, setUserProfile } from "@/api/profile";
 import KeyboardAvoidingLayout from "@/components/KeyboardAvoidingLayout";
 import NetworkIntro from "@/components/profile/NetworkIntro";
+import { ProfileCompletionBar } from "@/components/ProfileCompletionBar";
 import { useAuth } from "@/context/AuthContext";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
@@ -15,16 +16,99 @@ import {
 } from "react-native";
 
 export default function UpdateProfile() {
+  const { user } = useAuth();
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
   const [formValues, setFormValues] = useState<any>({});
   const [showPopUp, setShowPopUp] = useState<boolean>(true);
   const [locating, setLocating] = useState<boolean>(false);
+  const [completionPercentage, setCompletionPercentage] = useState<number>(0);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const validateEmail = (email: string): string | null => {
+    if (!email) return 'Email is required';
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email) ? null : 'Please enter a valid email address';
+  };
+
+  const validateField = (name: string, value: string) => {
+    if (name === 'email') {
+      return validateEmail(value);
+    }
+    return null;
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    
+    if (field === 'email') {
+      const error = validateField(field, formValues[field] || '');
+      setErrors(prev => ({
+        ...prev,
+        [field]: error || ''
+      }));
+    }
+  };
+
+  const handleChange = (field: string, value: string) => {
+    setFormValues((prev: any) => ({ ...prev, [field]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      const error = validateField(field, value);
+      setErrors(prev => ({
+        ...prev,
+        [field]: error || ''
+      }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    // Only validate email if it exists in the form
+    if ('email' in formValues) {
+      const emailError = validateEmail(formValues.email || '');
+      if (emailError) {
+        newErrors.email = emailError;
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const isFormValid = () => {
+    // Only check for errors in fields that have been touched
+    const hasErrors = Object.entries(errors).some(([field, error]) => 
+      touched[field] && error
+    );
+    return !hasErrors;
+  };
+
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      if (token) {
+        await setUserProfile(token, formValues);
+        getProfileSetupStatus();
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
+  };
 
   useEffect(() => {
     const fetchStepData = async () => {
       try {
         const res = await getStepData(token!, profileSetupStatus?.next_step as number);
-        setFormValues(res);
+        setFormValues(res.fields);
+        setCompletionPercentage(res.completion_percentage);
       } catch (err) {
         console.error(err);
       }
@@ -33,7 +117,7 @@ export default function UpdateProfile() {
   }, [profileSetupStatus, token]);
 
   const handleInputChange = (key: string, value: string) => {
-    setFormValues((prev: any) => ({ ...prev, [key]: value }));
+    handleChange(key, value);
   };
 
   const handleGetLocation = async () => {
@@ -77,6 +161,7 @@ export default function UpdateProfile() {
   };
 
   const handleNext = async () => {
+    if (!token) return;
     const res = await setUserProfile(token!, formValues);
     if (res) {
       await getProfileSetupStatus();
@@ -98,6 +183,7 @@ export default function UpdateProfile() {
 
   return (
     <View className="flex-1 bg-[#3A327B]">
+      <ProfileCompletionBar progress={completionPercentage} />
       <KeyboardAvoidingLayout>
         {/* Header */}
         <View className="pt-24 px-6">
@@ -117,7 +203,12 @@ export default function UpdateProfile() {
           className="px-6 mt-10"
         >
           <View className="flex gap-4 bg-black/15 rounded-md p-5">
-            {Object.keys(formValues).map((key) => (
+            {Object.keys(formValues).filter(key => {
+              if (user?.persona === 'Student' && key === 'company') {
+                return false;
+              }
+              return true;
+            }).map((key) => (
               <View key={key} className="mb-3">
                 <Text className="text-[#C6BFFF] mb-[7px] capitalize text-sm">
                   {key.replace("_", " ")} *
@@ -131,8 +222,11 @@ export default function UpdateProfile() {
                     .replace("_", " ")
                     .toLowerCase()}`}
                   placeholderTextColor="#C7C2ED"
-                  className="bg-[#4C4495] border border-white/10 rounded-xl py-[10px] px-4 text-white"
+                  className={`bg-[#4C4495] border ${errors[key] ? 'border-red-500' : 'border-white/10'} rounded-xl py-[10px] px-4 text-white`}
                 />
+                {errors[key] && (
+                  <Text className="text-red-400 text-xs mt-1">{errors[key]}</Text>
+                )}
                 {key === "location" && (
                   <TouchableOpacity
                     onPress={handleGetLocation}
@@ -159,9 +253,11 @@ export default function UpdateProfile() {
       {/* Next Button */}
       <View className="absolute bottom-8 left-6 right-6">
         <TouchableOpacity
-          onPress={handleNext}
+          onPress={handleSubmit}
           activeOpacity={0.9}
-          className="bg-[#C7C2ED] rounded-full py-4"
+          className="bg-white rounded-xl py-4 px-6 items-center mt-6"
+          disabled={!isFormValid()}
+          style={{ opacity: isFormValid() ? 1 : 0.6 }}
         >
           <Text className="text-[#3A327B] text-center font-semibold text-base">
             Next

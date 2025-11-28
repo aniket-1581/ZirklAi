@@ -57,3 +57,16 @@ export async function verifyOtp(phone_number: string, otp: string) {
     if (!res.ok) throw new Error('Failed to verify OTP');
     return res.json();
 }
+
+export async function updateTimezone(token: string, timezone: string) {
+    const res = await fetch(`${BASE_URL}/me/timezone`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ timezone }),
+    });
+    if (!res.ok) throw new Error('Failed to update timezone');
+    return res.json();
+}

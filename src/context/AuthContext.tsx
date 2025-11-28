@@ -10,13 +10,13 @@ import React, {
 } from "react";
 import Toast from "react-native-toast-message";
 
-import { login as apiLogin, getUser, verifyOtp } from "@/api/auth";
+import { login as apiLogin, getUser, updateTimezone, verifyOtp } from "@/api/auth";
 import { createCallLogs } from "@/api/call-logs";
 import { registerAndSendFcmToken } from "@/api/notifications";
-import CallLogService from "@/utils/CallLogService";
 import { getProfileStatus, ProfileStatusResponse } from "@/api/profile";
-import { initMixpanel, identify, track, setUserProps, resetMixpanel } from "@/lib/mixpanel";
-
+import { identify, initMixpanel, resetMixpanel, setUserProps, track } from "@/lib/mixpanel";
+import CallLogService from "@/utils/CallLogService";
+import { getTimezone } from "@/utils/timezone";
 
 interface User {
   id: string;
@@ -28,6 +28,12 @@ interface User {
   goal?: string;
   businessCardQRCode?: string;
   email?: string;
+  persona?: string;
+  profile_completed?: boolean;
+  expertise_level?: string;
+  engagement_plan?: string;
+  strategy?: string;
+  user_challenges?: string;
   [key: string]: any;
 }
 
@@ -153,8 +159,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [token]);
 
+  const shouldSyncCallLogs = async () => {
+    try {
+      const lastSync = await AsyncStorage.getItem('@last_call_log_sync');
+      if (!lastSync) return true;
+      
+      const lastSyncDate = new Date(lastSync);
+      const today = new Date();
+      
+      // Check if a day has passed since last sync
+      const diffTime = Math.abs(today.getTime() - lastSyncDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays >= 1;
+    } catch (error) {
+      console.error('Error checking last sync date:', error);
+      return false;
+    }
+  };
+
+  const updateLastSyncDate = async () => {
+    try {
+      await AsyncStorage.setItem('@last_call_log_sync', new Date().toISOString());
+    } catch (error) {
+      console.error('Error updating last sync date:', error);
+    }
+  };
+
   const syncCallLogsToServer = useCallback(async () => {
     if (!token) return;
+
+    // Check if we should sync (once per day)
+    const shouldSync = await shouldSyncCallLogs();
+    if (!shouldSync) {
+      console.log('Call logs already synced today. Skipping...');
+      return;
+    }
 
     const callLogService = CallLogService.getInstance();
     try {
@@ -163,9 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const permissionGranted =
           await callLogService.requestCallLogPermission();
         if (!permissionGranted) {
-          console.log(
-            "Call log permission not granted. Cannot sync call logs."
-          );
+          console.log("Call log permission not granted. Cannot sync call logs.");
           return;
         }
       }
@@ -184,6 +222,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (logsToSave.length > 0) {
           await createCallLogs(logsToSave, token);
+          await updateLastSyncDate(); // Update sync time only on successful sync
+          console.log('Call logs synced successfully');
         } else {
           console.log("No call logs to sync.");
         }
@@ -202,6 +242,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       (async () => {
         try {
           await getUserDetails();
+          if (user && (user.timezone === "" || user.timezone === null)) {
+            const timezone = await getTimezone();
+            await updateTimezone(token, timezone);
+          }
           await getProfileSetupStatus();
           await getNotificationToken();
           await syncCallLogsToServer();
@@ -230,7 +274,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   ]);
 
   const login = useCallback(
-    async (phoneNumber: string) => {
+    async (phoneNumber: string): Promise<{ success: boolean; message?: string }> => {
+      if (phoneNumber.length !== 10) {
+        Toast.show({
+          type: "error",
+          text1: "Invalid Phone Number",
+          text2: "Please enter 10 digit phone number.",
+        });
+        return { success: false, message: "Please enter 10 digit phone number." };
+      }
       setIsLoading(true);
       try {
         const res = (await apiLogin(phoneNumber)) as {

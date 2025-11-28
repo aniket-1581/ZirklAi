@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   TextInput,
   FlatList,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -35,6 +36,8 @@ export default function ContactSelector({
   onDone,
   onContactSync,
 }: ContactSelectorProps) {
+  const inputRef = useRef<TextInput>(null);
+
   if (!showContactSelector) return null;
 
   const filteredContacts = (savedContacts || []).filter((contact) =>
@@ -43,9 +46,9 @@ export default function ContactSelector({
 
   return (
     <View className="absolute inset-0 bg-[#3A327B]">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1 px-6">
         {/* Header */}
-        <View className="flex-row items-center justify-between px-6 pt-6">
+        <View className="flex-row items-center justify-between pt-6">
           <Text className="text-white text-xl font-semibold leading-6">
             Choose people who can{"\n"}help you move forward.
           </Text>
@@ -58,7 +61,7 @@ export default function ContactSelector({
         </View>
 
         {/* Selection Info */}
-        <View className="flex-row items-center justify-between px-6 py-3">
+        <View className="flex-row items-center justify-between py-3">
           <Text className="text-[#C7C2ED] text-sm font-medium">
             Select multiple
           </Text>
@@ -68,18 +71,19 @@ export default function ContactSelector({
         </View>
 
         {/* Search Bar */}
-        <View className="px-6 mb-4">
-          <View className="flex-row items-center bg-[#c6bfff]/10 border border-white/10 rounded-xl px-3 py-3">
-            <MaterialIcons name="search" size={20} color="#C7C2ED" />
+        <Pressable  onPress={() => inputRef.current?.focus()} className="w-full mb-4">
+          <View className="flex-row gap-2 justify-between items-center bg-[#c6bfff]/10 border border-white/10 rounded-xl px-3 py-2">
+            <MaterialIcons name="search" size={16} color="#C7C2ED" />
             <TextInput
+              ref={inputRef}
               value={searchQuery}
               onChangeText={onSearchChange}
               placeholder="Search Contact"
               placeholderTextColor="#C7C2ED"
-              className="ml-2 text-base text-white"
+              className="flex-1 text-base text-white pb-2"
             />
           </View>
-        </View>
+        </Pressable>
 
         {/* Contact List */}
         <FlatList
@@ -87,7 +91,7 @@ export default function ContactSelector({
           keyExtractor={(item, index) =>
             `${item.id || item.phoneNumber || index}-${item.name}`
           }
-          className="flex-1 px-6"
+          className="flex-1"
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const contactName = item.name || item.contact_name || "Unknown";
@@ -126,7 +130,7 @@ export default function ContactSelector({
         />
 
         {/* Bottom Buttons */}
-        <View className="px-6 py-5">
+        <View className="py-5">
           <TouchableOpacity
             onPress={onDone}
             activeOpacity={0.9}

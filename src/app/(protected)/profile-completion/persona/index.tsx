@@ -1,10 +1,11 @@
 import { getStepData, setUserPersona } from "@/api/profile";
+import { ProfileCompletionBar } from "@/components/ProfileCompletionBar";
 import { useAuth } from "@/context/AuthContext";
 import {
-  Entypo,
-  FontAwesome5,
-  Ionicons,
-  MaterialIcons,
+    Entypo,
+    FontAwesome5,
+    Ionicons,
+    MaterialIcons,
 } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -13,12 +14,15 @@ export default function Persona() {
   const { profileSetupStatus, token, getProfileSetupStatus } = useAuth();
   const [stepData, setStepData] = useState<any>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [completionPercentage, setCompletionPercentage] = useState<number>(0);
 
   useEffect(() => {
     const fetchStepData = async () => {
       try {
         const res = await getStepData(token!, profileSetupStatus?.next_step as number);
         setStepData(res);
+        setCompletionPercentage(res.completion_percentage);
+        console.log(res);
       } catch (err) {
         console.error(err);
       }
@@ -48,6 +52,7 @@ export default function Persona() {
 
   return (
     <View className="flex-1 bg-[#3A327B]">
+      <ProfileCompletionBar progress={completionPercentage} />
       <View className="flex-1 pt-24 px-6">
         {/* Header */}
         <Text className="text-white text-2xl font-bold text-center mb-2">
@@ -58,7 +63,7 @@ export default function Persona() {
         </Text>
 
         {/* Options */}
-        <View className="bg-black/15 rounded-md px-5">
+        <View className="bg-black/15 rounded-md px-6">
           {stepData?.persona_options?.map((item: any, index: number) => (
             <TouchableOpacity
               key={item.key}
@@ -88,7 +93,7 @@ export default function Persona() {
           <TouchableOpacity
             onPress={handleNext}
             activeOpacity={0.9}
-            className="bg-[#C7C2ED] rounded-full py-4"
+            className="bg-white rounded-full py-4"
           >
             <Text className="text-[#3A327B] text-center font-semibold text-base">
               Next

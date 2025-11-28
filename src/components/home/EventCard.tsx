@@ -1,20 +1,22 @@
-import React, { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRoundRobinAssignment } from "@/hooks/useRoundRobinAssignment";
 import { ImageIcons } from "@/utils/ImageIcons";
 import { formatUtcToIstTime } from "@/utils/date";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
+import { getGender } from "gender-detection-from-name";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  Share,
+  Text,
   TouchableOpacity,
   View,
-  Text,
-  Image,
-  ScrollView,
-  Modal,
-  Share,
-  Alert,
 } from "react-native";
-import { getGender } from "gender-detection-from-name";
-import * as Clipboard from "expo-clipboard";
-import { Feather, MaterialIcons } from "@expo/vector-icons";
-import { useAuth } from "@/context/AuthContext";
 
 interface EventCardProps {
   items: any[];
@@ -33,8 +35,56 @@ export default function EventCard({
 }: EventCardProps) {
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [unreadItems, setUnreadItems] = useState<{ [key: string]: boolean }>({});
+  const STORAGE_KEY = "unread_nudges_followups";
 
   const { token } = useAuth();
+
+  useEffect(() => {
+    const loadUnreadState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setUnreadItems(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error("Failed to load unread state", err);
+      }
+    };
+
+    loadUnreadState();
+  }, []);
+  // ---- NEW CODE FOR STABLE NON-REPEATING RANDOM IMAGES ---- //
+
+  const cardImages = [
+    ImageIcons.DigitalCalendar,
+    ImageIcons.GenericScheduler,
+    ImageIcons.MeetingCalendar,
+    ImageIcons.ScheduleMeeting,
+    ImageIcons.CasualGratitude,
+    ImageIcons.GratitudeCollaboration,
+    ImageIcons.ThankingAtWork,
+    ImageIcons.ThankingPeople,
+  ];
+
+  const femalePool = [
+    ImageIcons.GirlImage,
+    ImageIcons.GirlImage2,
+    ImageIcons.GirlImage3,
+    ImageIcons.GirlImage4,
+    ImageIcons.WomanImage,
+  ];
+
+  const malePool = [
+    ImageIcons.BoyImage,
+    ImageIcons.BoyImage2,
+    ImageIcons.BoyImage3,
+    ImageIcons.MenImage,
+  ];
+
+  const femaleRR = useRoundRobinAssignment(femalePool, "event_avatar_female");
+  const maleRR = useRoundRobinAssignment(malePool, "event_avatar_male");
+  const cardsRR = useRoundRobinAssignment(cardImages, "event_avatar_card");
 
   const handleDelete = (nudgeId: string) => {
     if (!token) return;
@@ -63,73 +113,65 @@ export default function EventCard({
     );
   };
 
-
   const defaultRenderItem = (item: any, index: number) => {
     if (type === "combined") {
       const itemType = item.type;
       const gender = getGender(
-        itemType === "followup"
-          ? item.title.split("for ")[1]?.split(" ")[0] || ""
-          : item.contact_name?.split(" ")[0] || "",
+        itemType === "followup" && item.contact_name?.split(" ")[0],
         "en"
       );
 
-      const femaleUserIcon = [
-        ImageIcons.GirlImage,
-        ImageIcons.GirlImage2,
-        ImageIcons.GirlImage3,
-        ImageIcons.GirlImage4,
-      ];
-      const maleUserIcon = [
-        ImageIcons.BoyImage,
-        ImageIcons.BoyImage2,
-        ImageIcons.BoyImage3,
-      ];
-      const randomFemaleUserIcon =
-        femaleUserIcon[Math.floor(Math.random() * femaleUserIcon.length)];
-      const randomMaleUserIcon =
-        maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
-
-      const randomCardImage =
-        itemType === "followup"
-          ? [ImageIcons.Calendar, ImageIcons.Calendar2][
-              Math.floor(Math.random() * 2)
-            ]
-          : [ImageIcons.FollowUp, ImageIcons.FollowUp2][
-              Math.floor(Math.random() * 2)
-            ];
+      const avatar = gender === "male"
+        ? maleRR.assign(item.id)
+        : femaleRR.assign(item.id);
+      const cardImg = cardsRR.assign(item.id ? item.id : item._id);
 
       const displayName =
         itemType === "followup"
-          ? item.title.split("for ")[1] || "Unknown"
-          : item.contact_name || "Unknown";
+          ? item.contact_name || "Unknown"
+          : item.contact_name.includes("for")
+            ? item.contact_name.split("for ")[1]
+            : item.contact_name;
 
       const message =
         itemType === "followup"
           ? `${new Date(item.startDate).toDateString()} ${formatUtcToIstTime(item.startDate)}`
-          : item.message?.slice(0, 40) || "No message";
+          : `${new Date(item.created_at).toDateString()} ${formatUtcToIstTime(item.created_at)}`;
 
       return (
         <TouchableOpacity
           key={index}
-          onPress={() => {
+          onPress={async () => {
             setSelectedItem(item);
             setPopupVisible(true);
+
+            // Mark as read
+            const updated = { ...unreadItems, [item.id]: false };
+            setUnreadItems(updated);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
           }}
+
           className="items-center mr-5"
         >
           <View className="flex gap-3 items-start">
             <Image
-              source={randomCardImage}
+              source={cardImg}
               className="w-[230px] h-[149px] rounded-xl"
             />
             <View className="flex flex-row gap-2 items-center">
-              <Image
-                source={
-                  gender === "male" ? randomMaleUserIcon : randomFemaleUserIcon
-                }
-                className="w-10 h-10 rounded-full"
-              />
+              <View className="relative">
+                <Image
+                  source={avatar}
+                  className="w-10 h-10 rounded-full"
+                />
+
+                {unreadItems[item.id] && (
+                  <View
+                    className="w-3 h-3 bg-red-500 rounded-full absolute top-0 right-0 border border-white"
+                  />
+                )}
+              </View>
+
               <View className="flex flex-col">
                 <Text className="text-sm font-medium text-start text-white">
                   {displayName}
@@ -147,6 +189,36 @@ export default function EventCard({
     return null;
   };
 
+  useEffect(() => {
+    const syncUnreadWithStorage = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        let storedUnread = stored ? JSON.parse(stored) : {};
+
+        let updated = { ...storedUnread };
+
+        // Mark only NEW items as unread
+        items.forEach((item) => {
+          if (updated[item.id] === undefined) {
+            updated[item.id] = true; 
+          }
+        });
+
+        setUnreadItems(updated);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (err) {
+        console.error("Failed updating unread state:", err);
+      }
+    };
+
+    syncUnreadWithStorage();
+  }, [items]);
+
+  useEffect(() => {
+    femaleRR.load();
+    maleRR.load();
+    cardsRR.load();
+  }, []);
 
   return (
     <>
@@ -180,7 +252,11 @@ export default function EventCard({
                   className=""
                   onPress={() => handleDelete(selectedItem._id)}
                 >
-                  <MaterialIcons name="delete" size={22} color="red" />
+                  <MaterialIcons
+                    name="delete-outline"
+                    size={22}
+                    color="#FF7777"
+                  />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -191,22 +267,38 @@ export default function EventCard({
               </TouchableOpacity>
             </View>
 
-            {selectedItem?.type === "followup" ? (
-              selectedItem.title.startsWith("Follow Up") ? (
-                <Text className="text-lg font-bold text-white mb-4">Micro-journal Action</Text>
+            {selectedItem?.type === "nudge" ? (
+              selectedItem?.state_name === "TopContactsNudgeState" ? (
+                <Text className="text-lg font-bold text-white mb-4">
+                  Top Contacts
+                </Text>
+              ) : selectedItem?.state_name === "GratitudeNudgeState" ? (
+                <Text className="text-lg font-bold text-white mb-4">
+                  Thank You Message
+                </Text>
+              ) : selectedItem?.state_name === "StayConnectedNudgeState" ? (
+                <Text className="text-lg font-bold text-white mb-4">
+                  Stay Connected
+                </Text>
               ) : (
-                <Text className="text-lg font-bold text-white mb-4">Follow Up</Text>
+                <Text className="text-lg font-bold text-white mb-4">
+                  Follow Up
+                </Text>
               )
             ) : (
-              selectedItem?.state_name === 'StayConnectedNudgeState' ? (
-                <Text className="text-lg font-bold text-white mb-4">Stay Connected</Text>
+              selectedItem?.type === "followup" ? (
+                <Text className="text-lg font-bold text-white mb-4">
+                  Calendar Follow-up
+                </Text>
               ) : (
-                <Text className="text-lg font-bold text-white mb-4">Message</Text>
+                <Text className="text-lg font-bold text-white mb-4">
+                  Micro Journal Entry
+                </Text>
               )
             )}
 
             {/* FOLLOWUP TYPE */}
-            {selectedItem && selectedItem.type === "followup" && (
+            {selectedItem && selectedItem?.type === "followup" && (
               <ScrollView className="max-h-[70vh]">
                 <View className="mb-4">
                   <Text className="text-white mb-2">
@@ -228,8 +320,12 @@ export default function EventCard({
                     (() => {
                       const notes = selectedItem.notes.trim();
                       // Extract Coach Tip and remove it from main notes text
-                      const coachTipMatch = notes.match(/Coach Tip:\s*([\s\S]*)/i);
-                      const coachTip = coachTipMatch ? coachTipMatch[1].trim() : null;
+                      const coachTipMatch = notes.match(
+                        /Coach Tip:\s*([\s\S]*)/i
+                      );
+                      const coachTip = coachTipMatch
+                        ? coachTipMatch[1].trim()
+                        : null;
                       const mainNotes = coachTipMatch
                         ? notes.replace(coachTipMatch[0], "").trim()
                         : notes;
@@ -320,7 +416,11 @@ export default function EventCard({
                                   }}
                                   className="mr-3"
                                 >
-                                  <Feather name="copy" size={18} color="white" />
+                                  <Feather
+                                    name="copy"
+                                    size={18}
+                                    color="white"
+                                  />
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -350,7 +450,7 @@ export default function EventCard({
             )}
 
             {/* NUDGE TYPE */}
-            {selectedItem && selectedItem.type === "nudge" && (
+            {selectedItem && selectedItem?.type === "nudge" && (
               <View className="mb-4">
                 <Text className="text-white mb-2">
                   <Text className="font-semibold">Contact:</Text>{" "}

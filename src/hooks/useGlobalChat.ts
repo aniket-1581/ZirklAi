@@ -10,6 +10,7 @@ import { Message, Option } from '@/types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { CalendarEventResponse, getCalendarEvents } from '@/api/calendar';
 
 export function useGlobalChat() {
   const { token } = useAuth();
@@ -20,9 +21,20 @@ export function useGlobalChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
+  const [events, setEvents] = useState<CalendarEventResponse[]>([]);
 
   // Ensure we only trigger returning message once per entry (focus) session
   const hasTriggeredReturningRef = useRef(false);
+
+  const loadEvents = useCallback(async () => {
+    if (!token) return;
+    try {
+      const events = await getCalendarEvents(token);
+      setEvents(events.calendar_events);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+    }
+  }, [token]);
 
   const normalizeMessages = (data: any): Message[] => {
     if (!data) return [];
@@ -52,37 +64,39 @@ export function useGlobalChat() {
   // onEnter flag decides whether to trigger returning message once
   const loadHistory = useCallback(async (onEnter: boolean = false) => {
     if (!token) return;
-    setIsLoading(true);
+
+    setIsLoading(true); // ALWAYS show loader when entering
+
     try {
-      if (onEnter && !hasTriggeredReturningRef.current) {
+      // When entering screen — ALWAYS trigger returning message first
+      if (onEnter) {
         try {
           await getReturningMessage(token);
-          hasTriggeredReturningRef.current = true;
-        } catch {
-          console.warn('Returning message fetch failed');
+        } catch (err) {
+          console.warn("Returning message fetch failed:", err);
         }
       }
 
+      // Now fetch updated history AFTER returning message is done
       const history = await getGlobalChatHistory(token);
       const normalized = normalizeMessages(history);
 
       if (normalized.length > 0) {
         setMessages(normalized);
       } else {
+        // fallback if empty
         await loadWelcomeMessage();
         const historyAfterWelcome = await getGlobalChatHistory(token);
-        const normalizedAfterWelcome = normalizeMessages(historyAfterWelcome);
-        if (normalizedAfterWelcome.length > 0) {
-          setMessages(normalizedAfterWelcome);
-        }
+        setMessages(normalizeMessages(historyAfterWelcome));
       }
     } catch (error) {
-      console.error('Failed to load zirkl assistant history:', error);
-      Alert.alert('Error', 'Failed to load chat.');
+      console.error("Failed to load zirkl assistant history:", error);
+      Alert.alert("Error", "Failed to load chat.");
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); 
     }
   }, [token, loadWelcomeMessage]);
+
 
   const handleTextSubmit = async (text?: string) => {
     Keyboard.dismiss();
@@ -139,15 +153,26 @@ export function useGlobalChat() {
   // Trigger on focus so re-entering the chat runs the returning check
   useEffect(() => {
     if (isFocused && token) {
-      // Treat every focus as a fresh entry
+
+      // 1️⃣ Clear UI immediately (prevents stale messages from flashing)
+      setMessages([]);
+      setIsLoading(true);
+
+      // 2️⃣ Reset returning flag
       hasTriggeredReturningRef.current = false;
-      loadHistory(true);
+
+      // 3️⃣ Load everything AFTER clearing UI
+      (async () => {
+        await loadHistory(true);   // returning message included
+        await loadEvents();
+      })();
     }
-    // On blur/unmount, reset so next focus can trigger again
+
     return () => {
       hasTriggeredReturningRef.current = false;
     };
-  }, [isFocused, token, loadHistory]);
+  }, [isFocused, token]);
+
 
   return {
     messages,
@@ -159,5 +184,6 @@ export function useGlobalChat() {
     handleTextSubmit,
     handleOptionSelect,
     loadHistory,
+    events
   };
 }

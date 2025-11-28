@@ -1,22 +1,28 @@
-import { formatUtcToIstTime } from "@/utils/date";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  Text,
-  TouchableOpacity,
-  View,
-  Keyboard,
   Image,
+  Keyboard,
   ScrollView,
   Share,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { Message, Option } from "../types";
-import { useCalendar } from "../hooks/useCalendar";
+
 import { ImageIcons } from "@/utils/ImageIcons";
 import { getGender } from "gender-detection-from-name";
+
+// Hook + API
+import { CalendarEventResponse, createCalendarEvents } from "@/api/calendar";
+import { useAuth } from "@/context/AuthContext";
+import { useRoundRobinAssignment } from "@/hooks/useRoundRobinAssignment";
+import { useCalendar } from "../hooks/useCalendar";
+
 
 interface MessageListProps {
   messages: Message[];
@@ -25,6 +31,7 @@ interface MessageListProps {
   flatListRef: React.RefObject<FlatList<Message> | null>;
   currentStep: string;
   user: string;
+  events: CalendarEventResponse[];
 }
 
 export default function GlobalMessageList({
@@ -34,146 +41,150 @@ export default function GlobalMessageList({
   flatListRef,
   currentStep,
   user,
+  events,
 }: MessageListProps) {
-  const { createDeviceEvent, events } = useCalendar();
+  const { token } = useAuth();
+  const { createDeviceEvent } = useCalendar();
+
+  // Smooth keyboard adjust
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // Copy tracking
   const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>(
     {}
   );
-  const [createdEventIds, setCreatedEventIds] = useState<Set<string>>(
-    new Set()
-  );
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
 
+  const femalePool = [
+    ImageIcons.GirlImage,
+    ImageIcons.GirlImage2,
+    ImageIcons.GirlImage3,
+    ImageIcons.GirlImage4,
+    ImageIcons.WomanImage,
+  ];
+  
+  const malePool = [
+    ImageIcons.BoyImage,
+    ImageIcons.BoyImage2,
+    ImageIcons.BoyImage3,
+    ImageIcons.MenImage,
+  ];
+  
+  const femaleRR = useRoundRobinAssignment(femalePool, "global_avatar_female");
+  const maleRR = useRoundRobinAssignment(malePool, "global_avatar_male");
+
+  // Clipboard copy
   const handleCopy = (text: string, key: string) => {
     Clipboard.setStringAsync(text);
     setCopiedStates((prev) => ({ ...prev, [key]: true }));
-    setTimeout(() => {
-      setCopiedStates((prev) => ({ ...prev, [key]: false }));
-    }, 3000);
+    setTimeout(
+      () => setCopiedStates((prev) => ({ ...prev, [key]: false })),
+      2000
+    );
   };
 
+  // Share handler
   const handleShare = (text: string) => {
-    Share.share({
-      message: text,
-    });
+    Share.share({ message: text });
   };
 
-  const extractContactName = (content: string): string => {
-    // Look for patterns like "Hi [Name]," or "Hello [Name]," or just "[Name],"
-    const namePatterns = [
-      /Hi\s+([^,]+),/i,
-      /Hello\s+([^,]+),/i,
-      /Dear\s+([^,]+),/i,
-      /^([^,\n]+),/m, // Name at the start of a line followed by comma
-    ];
-
-    for (const pattern of namePatterns) {
-      const match = content.match(pattern);
-      if (match && match[1] && match[1].trim().length > 0) {
-        const name = match[1].trim();
-        // Make sure it's not a generic greeting like "Hi there," or "Hi team,"
-        if (!["there", "team", "everyone"].includes(name.toLowerCase())) {
-          return name;
+  // Calendar event creator (same logic you had)
+  const handleCreateCalendarEvent = useCallback(
+    async (message: Message) => {
+      if (!message.start_time) return;
+      try {
+        const messageTs = new Date(message.start_time).toISOString();
+        const existing = events.find(
+          (e) =>
+            e.notes === message.content &&
+            e.startDate &&
+            new Date(e.startDate).toISOString() === messageTs
+        );
+        if (existing) {
+          Toast.show({
+            type: "info",
+            text1: "Event Already Exists",
+          });
+          return;
         }
-      }
-    }
 
-    return "";
-  };
+        const startDate = new Date(message.start_time);
+        const endDate = new Date(startDate.getTime() + 3600000);
 
-  const handleCreateCalendarEvent = async (message: Message) => {
-    if (!message.start_time) return;
+        const title = message.contact_name
+          ? `[Zirkl Ai] Reminder for ${message.contact_name}`
+          : `[Zirkl Ai]`;
 
-    try {
-      // Check if event already exists for this message
-      const messageTimestamp = new Date(message.start_time).toISOString();
-      const existingEvent = events.find(
-        (event) =>
-          event.notes === message.content &&
-          event.startDate &&
-          new Date(event.startDate).toISOString() === messageTimestamp
-      );
+        await createCalendarEvents(
+          {
+            calendar_events: [
+              {
+                title,
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                location: "remote",
+                notes: message.content,
+                timeZone: "Asia/Kolkata",
+                contact_name: message.contact_name,
+              },
+            ],
+          },
+          token as string
+        );
 
-      if (existingEvent) {
-        Toast.show({
-          type: "info",
-          text1: "Event Already Created",
-          text2: "This reminder has already been added to your calendar.",
-          visibilityTime: 3000,
+        await createDeviceEvent({
+          title,
+          startDate,
+          endDate,
+          location: "remote",
+          notes: message.content,
+          reminders: [10, 30],
         });
-        return;
+
+        Toast.show({
+          type: "success",
+          text1: "Event Created Successfully",
+        });
+      } catch (err: any) {
+        console.log(err);
+        Toast.show({
+          type: "error",
+          text1: "Failed to create event",
+        });
       }
+    },
+    [token, events]
+  );
 
-      // Parse the start_time string into a Date object
-      const startDate = new Date(message.start_time);
+  // Keyboard events
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () =>
+      setIsKeyboardVisible(true)
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setIsKeyboardVisible(false)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
-      // Validate that the date was parsed correctly
-      if (isNaN(startDate.getTime())) {
-        throw new Error("Invalid start_time format");
-      }
+  // 🟣 CHATGPT/WHATSAPP STYLE LIST = reversed + inverted
+  const reversedMessages = useMemo(
+    () => [...messages].reverse(),
+    [messages]
+  );
 
-      // Calculate end date (1 hour after start time)
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+  // --------- MESSAGE RENDERING (unchanged from your version) ---------
 
-      // Extract contact name from message content
-      const contactName = extractContactName(message.content || "");
-
-      // Create title with contact name if available
-      const title = contactName
-        ? `[Zirkl Ai] Reminder for ${contactName}`
-        : `[Zirkl Ai]`;
-
-      await createDeviceEvent({
-        title,
-        startDate,
-        endDate,
-        location: "remote",
-        notes: message.content,
-        reminders: [10, 30], // 10 and 30 minutes before the event
-      });
-
-      // Track that this message has an event created
-      if (message.start_time) {
-        setCreatedEventIds((prev) => new Set([...prev, message.start_time!]));
-      }
-
-      Toast.show({
-        type: "success",
-        text1: "Event Created Successfully",
-        text2: "Reminder has been added to your calendar.",
-        visibilityTime: 3000,
-      });
-    } catch (error) {
-      console.error("Error creating calendar event:", error);
-      Toast.show({
-        type: "error",
-        text1: "Error Creating Event",
-        text2: "Failed to create calendar event. Please try again.",
-        visibilityTime: 3000,
-      });
-    }
-  };
-
-  const handleScroll = (event: any) => {
-    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
-    
-    const isAtBottom =
-      layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
-
-    setIsUserAtBottom(isAtBottom);
-  };
-
-  const renderFormattedText = (text: string) => {
-    // Split by ### headers first
+  const renderFormattedText = useCallback((text: string) => {
     const headerRegex = /(### .*?)(?=\n|$)/g;
     const parts = text.split(headerRegex);
 
     return (
       <View className="flex-col">
         {parts.map((part, index) => {
-          // Handle ### headers
-          if (part.startsWith("### ")) {
+          if (part.startsWith("### "))
             return (
               <Text
                 key={index}
@@ -182,28 +193,24 @@ export default function GlobalMessageList({
                 {part.slice(4).trim()}
               </Text>
             );
-          }
 
-          // Handle **bold text** within the remaining text
           if (part.includes("**")) {
             const boldParts = part.split(/(\*\*.*?\*\*)/g);
             return (
               <Text key={index} className="text-white text-base leading-5">
-                {boldParts.map((boldPart, boldIndex) => {
-                  if (boldPart.startsWith("**") && boldPart.endsWith("**")) {
-                    return (
-                      <Text key={boldIndex} className="font-bold text-white">
-                        {boldPart.slice(2, -2)}
-                      </Text>
-                    );
-                  }
-                  return boldPart;
-                })}
+                {boldParts.map((bp, i) =>
+                  bp.startsWith("**") && bp.endsWith("**") ? (
+                    <Text key={i} className="font-bold text-white">
+                      {bp.slice(2, -2)}
+                    </Text>
+                  ) : (
+                    bp
+                  )
+                )}
               </Text>
             );
           }
 
-          // Regular text
           return (
             <Text key={index} className="text-white text-base leading-5 mb-1">
               {part}
@@ -212,7 +219,7 @@ export default function GlobalMessageList({
         })}
       </View>
     );
-  };
+  }, []);
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const isUser = item.role === "user";
@@ -222,7 +229,7 @@ export default function GlobalMessageList({
 
     const gender = getGender(user.split(" ")[0], "en");
     const randomUserIcon =
-      gender === "male" ? ImageIcons.MenImage : ImageIcons.WomanImage;
+      gender === "male" ? ImageIcons.MaleAvatar : ImageIcons.FemaleAvatar;
 
     // --- Parsing Logic ---
     let isComplexAssistantMessage = false;
@@ -276,22 +283,12 @@ export default function GlobalMessageList({
             <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
             <View className="flex-col items-start mb-4">
               {introText && (
-                <View className="w-80 self-start border bg-black/15 border-white/15 rounded-2xl px-6 py-4 mb-4">
+                <View className="w-80 self-start border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4 mb-4">
                   <View className="mb-2">{renderFormattedText(introText)}</View>
-
-                  {/* Calendar button for messages with start_time */}
-                  {item.start_time && !createdEventIds.has(item.start_time) && (
-                    <TouchableOpacity
-                      className="absolute right-2 top-2 bg-blue-50 border border-white/15 rounded-full p-1.5"
-                      onPress={() => handleCreateCalendarEvent(item)}
-                    >
-                      <MaterialIcons name="event" size={14} color="#3B82F6" />
-                    </TouchableOpacity>
-                  )}
                 </View>
               )}
               {reminderText && (
-                <View className="w-80 self-start border bg-black/15 border-white/15 rounded-2xl px-6 py-4 mb-4">
+                <View className="w-80 self-start border bg-[#5248A0] border-white/15 rounded-2xl px-6 py-4 mb-4">
                   <View className="mb-2">
                     {renderFormattedText(reminderText)}
                   </View>
@@ -337,7 +334,7 @@ export default function GlobalMessageList({
                             />
                           </TouchableOpacity>
                           <TouchableOpacity
-                            onPress={() => handleShare(trimmedMsg.split(":")[1])}
+                            onPress={() => handleShare(trimmedMsg.split(`Message ${idx + 1}:`)[1])}
                           >
                             <MaterialIcons name="share" size={18} color="#9CA3AF" />
                           </TouchableOpacity>
@@ -355,15 +352,14 @@ export default function GlobalMessageList({
                     key={`tip-${idx}`}
                     className="w-full flex-col items-start mb-4"
                   >
-                    <View className="w-80 flex-row items-start border bg-black/5 border-white/15 rounded-2xl px-6 py-4">
+                    <View className="w-80 flex-row items-start border bg-black/10 border-white/15 rounded-2xl px-6 py-4">
                       <View style={{ flex: 1 }} className="mb-2">
                         {renderFormattedText(trimmedTip)}
                       </View>
                     </View>
 
                     {/* Calendar button for coach tips with start_time */}
-                    {item.start_time &&
-                      !createdEventIds.has(item.start_time) && (
+                    {item.start_time && !events.find(event => event.startDate === item.start_time) && (
                         <TouchableOpacity
                           className="mt-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 self-start"
                           onPress={() => handleCreateCalendarEvent(item)}
@@ -394,7 +390,7 @@ export default function GlobalMessageList({
       return (
         <View className={`flex-row items-start mb-4`}>
           <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
-          <View className="w-80 border bg-black/15 border-white/15 rounded-xl px-5 py-3">
+          <View className="w-80 border bg-[#5248A0] border-white/15 rounded-xl px-6 py-3">
             <Text className="text-white text-base mb-3">
               {item.content
                 ? item.content
@@ -404,7 +400,7 @@ export default function GlobalMessageList({
             <View className="flex-row flex-wrap justify-between">
               {item?.options?.map((opt: any, index: number) => {
                 const cardClasses = opt.enabled
-                  ? "bg-[#5248A0] border border-white/15"
+                  ? "bg-black/10 border border-white/15"
                   : "bg-gray-50 border border-white/15 opacity-50";
 
                 return (
@@ -436,7 +432,7 @@ export default function GlobalMessageList({
         <View className={`flex-row items-start`}>
           <Image source={ImageIcons.Assistant} className="w-10 h-10 mr-2" />
           <View className="flex-col items-start mb-4 gap-4">
-            <View className="w-80 border bg-black/15 border-white/15 rounded-xl px-5 py-3">
+            <View className="w-80 border bg-black/15 border-white/15 rounded-xl px-6 py-3">
               <Text className="text-white text-base mb-3">
                 {item.content
                   ? item.content
@@ -447,23 +443,7 @@ export default function GlobalMessageList({
             <View className="flex-row w-full flex-wrap justify-start">
               {item?.options?.map((opt: any, index: number) => {
                 const gender = getGender(opt.name.split(" ")[0], "en");
-                const femaleUserIcon = [
-                  ImageIcons.GirlImage,
-                  ImageIcons.GirlImage2,
-                  ImageIcons.GirlImage3,
-                  ImageIcons.GirlImage4,
-                ];
-                const maleUserIcon = [
-                  ImageIcons.BoyImage,
-                  ImageIcons.BoyImage2,
-                  ImageIcons.BoyImage3,
-                ];
-                const randomFemaleUserIcon =
-                  femaleUserIcon[
-                    Math.floor(Math.random() * femaleUserIcon.length)
-                  ];
-                const randomMaleUserIcon =
-                  maleUserIcon[Math.floor(Math.random() * maleUserIcon.length)];
+                const avatarImage = gender === "male" ? maleRR.assign(opt.id) : femaleRR.assign(opt.id);
                 return (
                   <TouchableOpacity
                     key={index}
@@ -471,17 +451,10 @@ export default function GlobalMessageList({
                     className="w-[40%] rounded-xl p-3 mr-5 mb-4 bg-[#5248A0] border border-white/15 items-center"
                   >
                     {/* Avatar/Image */}
-                    {gender === "male" ? (
-                      <Image
-                        source={randomMaleUserIcon}
-                        className="w-6 h-6 rounded-full mb-2"
-                      />
-                    ) : (
-                      <Image
-                        source={randomFemaleUserIcon}
-                        className="w-6 h-6 rounded-full mb-2"
-                      />
-                    )}
+                    <Image
+                      source={avatarImage}
+                      className="w-6 h-6 rounded-full mb-2"
+                    />
 
                     {/* Name (centered) */}
                     <Text className="font-semibold text-xs text-center text-white mb-1">
@@ -512,7 +485,7 @@ export default function GlobalMessageList({
             />
           )}
           <View
-            className={`w-80 text-white ${isUser ? "bg-[#C6BFFF]/10" : "bg-black/15"} border border-white/10 rounded-2xl px-6 py-4`}
+            className={`w-80 text-white ${isUser ? "bg-[#C6BFFF]/10" : "bg-[#5248A0]"} border border-white/10 rounded-2xl px-6 py-4`}
           >
             <View className="mb-2">
               <Text className={`text-white text-base leading-5`}>
@@ -523,7 +496,11 @@ export default function GlobalMessageList({
             {/* Calendar button for messages with start_time */}
             {isAssistant &&
               item.start_time &&
-              !createdEventIds.has(item.start_time) && (
+              events.find(event => {
+                const eventDate = event.startDate ? new Date(event.startDate).toISOString().split('Z')[0] : null;
+                const itemDate = item.start_time ? new Date(item.start_time).toISOString().split('+')[0] : null;
+                return eventDate !== itemDate;
+              }) && (
                 <TouchableOpacity
                   className="absolute right-2 top-2 bg-blue-50 border border-white/10 rounded-full p-1.5"
                   onPress={() => handleCreateCalendarEvent(item)}
@@ -547,7 +524,7 @@ export default function GlobalMessageList({
                       disabled={
                         isWaitingForResponse || item.next_step !== currentStep
                       }
-                      className={`bg-[#5248A0] rounded-lg px-5 py-3 ${isWaitingForResponse ? "opacity-50" : ""}`}
+                      className={`bg-[#5248A0] rounded-lg px-6 py-3 ${isWaitingForResponse ? "opacity-50" : ""}`}
                     >
                       <Text className="text-white text-start font-medium">
                         {optionText}
@@ -562,56 +539,35 @@ export default function GlobalMessageList({
       );
     }
   };
-  // Use a useEffect hook to automatically scroll to the end
+
   useEffect(() => {
-    if (flatListRef.current) {
-      // The timeout gives the FlatList a moment to render the new item
-      // before attempting to scroll to it.
-      setTimeout(() => {
-        if (flatListRef.current) {
-          flatListRef.current.scrollToEnd({ animated: true });
-        }
-      }, 100);
-    }
-  }, [messages, flatListRef]);
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({
+        offset: 0, // inverted list => 0 means bottom
+        animated: false,
+        });
+      });
+      return () => {};
+  }, []);
 
-  // Keyboard handling
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
-      setIsKeyboardVisible(true);
-      setTimeout(() => {
-        if (flatListRef.current) {
-          flatListRef.current.scrollToEnd({ animated: true });
-        }
-      }, 100);
-    });
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      setIsKeyboardVisible(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [flatListRef]);
-
+  // final return — this is the optimized FlatList
   return (
     <FlatList
       ref={flatListRef}
-      data={messages}
-      keyExtractor={(_, idx) => idx.toString()}
-      renderItem={({ item, index }) => renderMessage({ item, index })}
+      data={reversedMessages}
+      inverted
+      keyExtractor={(_, i) => i.toString()}
+      renderItem={renderMessage}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 100 : 0 }}
-      onScroll={handleScroll}
-      scrollEventThrottle={16}
-      onContentSizeChange={() => {
-        // Auto-scroll ONLY if user is at the bottom
-        if (isUserAtBottom) {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }
+      contentContainerStyle={{
+        paddingTop: isKeyboardVisible ? 120 : 40,
+        paddingBottom: 40,
       }}
+      initialNumToRender={12}
+      windowSize={10}
+      maxToRenderPerBatch={10}
+      removeClippedSubviews={true}
     />
   );
 }

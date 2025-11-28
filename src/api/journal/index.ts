@@ -10,8 +10,10 @@ export interface JournalEntryRequest {
 }
 
 export interface UpdateEntryRequest {
-  entry_id: string;
-  entry: string;
+  entry?: string;
+  title?: string;
+  tags?: string[];
+  contact_name?: string;
 }
 
 export interface JournalEntriesResponse {
@@ -99,15 +101,15 @@ export async function updateEntryTitle(entryId: string, title: string, token: st
 }
 
 // Update a journal entry
-export async function updateEntry(entryId: string, entry: string, token: string): Promise<any>  {
-  const response = await fetch(`${BASE_URL}/update_audio_entry/${entryId}`, {
+export async function updateEntry(entry: UpdateEntryRequest, token: string, entryId: string): Promise<any>  {
+  const response = await fetch(`${BASE_URL}/update_audio_entry_comprehensive/${entryId}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'accept': 'application/json',
     },
-    body: JSON.stringify({ entry }),
+    body: JSON.stringify(entry),
   });
 
   if (!response.ok) {

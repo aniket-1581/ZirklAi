@@ -1,371 +1,279 @@
 import {
-  getNotifications,
-  NotificationItem,
-  nudgeAction,
   deleteNotification,
+  getNotifications,
+  NotificationItem as NItem,
+  nudgeAction,
 } from "@/api/notifications";
 import { useAuth } from "@/context/AuthContext";
 import { formatUtcToIstTime } from "@/utils/date";
-import {
-  notificationStorage,
-  SnoozedNotification,
-} from "@/utils/notificationStorage";
-import { MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  SectionList,
-  RefreshControl,
-  Text,
-  View,
-  TouchableOpacity,
   ActivityIndicator,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Toast from "react-native-toast-message";
 
+/* -------------------------------------------
+   GROUP BY DATE
+--------------------------------------------*/
+const groupByDateLabel = (notifications: NItem[]) => {
+  const now = new Date();
+  const todayString = now.toDateString();
+
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  return notifications.reduce((acc: any, item: NItem) => {
+    const date = new Date(item.created_at || "");
+    const dateString = date.toDateString();
+
+    const month = date.getMonth();
+    const year = date.getFullYear();
+
+    let label = "";
+
+    // TODAY
+    if (dateString === todayString) {
+      label = "Today";
+    }
+    // THIS MONTH
+    else if (month === currentMonth && year === currentYear) {
+      label = "This Month";
+    }
+    // LAST MONTH
+    else if (
+      (currentMonth === 0 && month === 11 && year === currentYear - 1) ||
+      (month === currentMonth - 1 && year === currentYear)
+    ) {
+      label = "Last Month";
+    }
+    // OLDER MONTHS → e.g. March 2024
+    else {
+      label = date.toLocaleString("default", {
+        month: "long",
+        year: "numeric",
+      });
+    }
+
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(item);
+
+    return acc;
+  }, {});
+};
+
+const NotificationCards = ({
+  item,
+  onDelete,
+  onNudge,
+}: {
+  item: NItem;
+  onDelete: (id: string) => void;
+  onNudge: (item: NItem) => void;
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const [readMore, setReadMore] = useState(false);
+  const isUnread = item.is_read === false || item.status !== "read";
+  return (
+    <View className="px-6 mb-4">
+      {/* CARD */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => {
+          setShowMenu(false);
+          onNudge(item);
+        }}
+        disabled={item.is_read === true}
+        className="bg-white/10 border border-white/10 rounded-xl p-4 flex-row gap-3 items-start"
+      >
+        {/* LEFT AVATAR */}
+
+        {/* RIGHT CONTENT */}
+        <View className="flex-1">
+          <View className="flex-row items-center gap-2">
+            <View className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              {isUnread ? <Ionicons name="mail" size={20} color="#fff" /> : <Ionicons name="mail-open" size={20} color="#fff" />}
+              {/* Red dot for unread */}
+              {isUnread && (
+                <View className="w-2 h-2 rounded-full bg-[#90cdf4] absolute top-0 right-0" />
+              )}
+            </View>
+            {/* LINE 1 — NAME + ACTION + DOC NAME */}
+            <Text className="text-white text-base font-semibold flex-1">
+              {item.title}{" "}
+            </Text>
+          </View>
+
+          {/* OPTIONAL COMMENT */}
+          {item.message && (
+            <View>
+              <Text className="text-white/80 text-sm mt-2">
+              {readMore ? `${item.message} ` : item.message.slice(0, 50) + "... "}
+              <Text
+                className="text-[#FF7777]/80 text-sm"
+                onPress={() => setReadMore(!readMore)}
+              >
+                {readMore ? "Read Less" : "Read More"}
+              </Text>
+              </Text>
+            </View>
+          )}
+
+        </View>
+          {/* TIME */}
+          <Text className="absolute right-5 bottom-2 text-white/50 text-xs">
+            {formatUtcToIstTime(item.created_at || "")}
+          </Text>
+        {/* 3 DOT MENU */}
+        <TouchableOpacity
+          onPress={() => setShowMenu(!showMenu)}
+          className="p-2 bg-white/15 rounded-full"
+        >
+          <MaterialIcons name="more-vert" size={20} color="#d1d5db" />
+        </TouchableOpacity>
+      </TouchableOpacity>
+      {/* DROPDOWN MENU */}
+      {showMenu && (
+        <View className="absolute top-14 right-8 bg-white rounded-xl shadow-lg p-2 min-w-[120px] z-50">
+          <TouchableOpacity
+            className="px-4 py-3 flex-row items-center"
+            onPress={() => {
+              setShowMenu(false);
+              onDelete(item._id);
+            }}
+          >
+            <MaterialIcons
+              name="delete-outline"
+              size={20}
+              color="#FF7777"
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-[#FF7777] font-medium">Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* -------------------------------------------
+   MAIN SCREEN
+--------------------------------------------*/
 export default function NotificationsScreen() {
   const { token } = useAuth();
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [snoozedItems, setSnoozedItems] = useState<SnoozedNotification[]>([]);
+  const [notifications, setNotifications] = useState<NItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showSnoozed, setShowSnoozed] = useState(false);
-  const [allNotifications, setAllNotifications] = useState<NotificationItem[]>(
-    []
-  );
   const router = useRouter();
 
+  /* LOAD NOTIFICATIONS */
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+
     try {
       const data = await getNotifications(token, 50, 0);
-      const notifications = Array.isArray(data) ? data : [];
-
-      // Sort notifications by created_at (newest first)
-      const sortedNotifications = notifications.sort((a, b) => {
-        const dateA = new Date(a.created_at || 0);
-        const dateB = new Date(b.created_at || 0);
-        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
-      });
-
-      setAllNotifications(sortedNotifications);
-    } catch {
-      setAllNotifications([]);
+      const sorted = (data || []).sort(
+        (a, b) =>
+          new Date(b.created_at as string).getTime() -
+          new Date(a.created_at as string).getTime()
+      );
+      setNotifications(sorted);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  // Filter notifications based on snoozed items when either changes
   useEffect(() => {
-    if (allNotifications.length > 0) {
-      const snoozedIds = new Set(snoozedItems.map((item) => item._id));
-      const activeNotifications = allNotifications.filter(
-        (notification: NotificationItem) => !snoozedIds.has(notification._id)
-      );
-      setItems(activeNotifications);
-    }
-  }, [allNotifications, snoozedItems]);
+    load();
+  }, [load]);
 
-  const loadSnoozed = useCallback(async () => {
-    const snoozed = await notificationStorage.getSnoozedNotifications();
-    setSnoozedItems(snoozed);
-  }, []);
+  /* DELETE HANDLER */
+  const deleteNotificationById = async (id: string) => {
+    if (!token) return;
+    await deleteNotification(token, id);
+    load();
+    Toast.show({ type: "success", text1: "Deleted successfully" });
+  };
 
-  // Refetch data when screen comes into focus (tab is selected)
-  useFocusEffect(
-    useCallback(() => {
-      load(); // Refetch notifications when tab is selected
-      loadSnoozed(); // Load snoozed notifications
-    }, [load, loadSnoozed])
-  );
-
+  /* RESTORED handleNudgeAction */
   const handleNudgeAction = async (notificationId: string) => {
     if (!token) return;
 
     setLoading(true);
     try {
       const res = await nudgeAction(token, notificationId);
+
       if (res.success) {
         router.push("/(protected)/(tabs)/home");
       }
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.log("Nudge error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const snoozeNotification = async (
-    notification: NotificationItem,
-    snoozeHours: number = 1
-  ) => {
-    try {
-      await notificationStorage.snoozeNotification(notification, snoozeHours);
-      await loadSnoozed(); // Refresh snoozed list
-      load(); // Refresh active list
-    } catch (error) {
-      console.error("Failed to snooze notification:", error);
-    }
+  /* WHAT HAPPENS WHEN USER TAPS A NOTIFICATION */
+  const handlePress = (item: NItem) => {
+    handleNudgeAction(item._id);
   };
 
-  const unsnoozeNotification = async (notificationId: string) => {
-    try {
-      await notificationStorage.unsnoozeNotification(notificationId);
-      await loadSnoozed(); // Refresh snoozed list
-      load(); // Refresh active list
-    } catch (error) {
-      console.error("Failed to unsnooze notification:", error);
-    }
-  };
+  /* GROUPING */
+  const grouped = groupByDateLabel(notifications);
+  const sectionKeys = Object.keys(grouped);
 
-  const currentItems = showSnoozed ? snoozedItems : items;
-
-  // Group notifications by date
-  const groupNotificationsByDate = (
-    notifications: (NotificationItem | SnoozedNotification)[]
-  ) => {
-    const groups: {
-      [key: string]: (NotificationItem | SnoozedNotification)[];
-    } = {};
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    notifications.forEach((notification) => {
-      const notificationDate = new Date(notification.created_at || "");
-      const dateKey = notificationDate.toDateString();
-
-      // Check if it's today
-      if (notificationDate.toDateString() === today.toDateString()) {
-        if (!groups["Today"]) groups["Today"] = [];
-        groups["Today"].push(notification);
-      }
-      // Check if it's yesterday
-      else if (notificationDate.toDateString() === yesterday.toDateString()) {
-        if (!groups["Yesterday"]) groups["Yesterday"] = [];
-        groups["Yesterday"].push(notification);
-      }
-      // Older dates - use the actual date
-      else {
-        if (!groups[dateKey]) groups[dateKey] = [];
-        groups[dateKey].push(notification);
-      }
-    });
-
-    // Convert to sections array and sort by date (newest first)
-    return Object.entries(groups)
-      .map(([title, data]) => ({ title, data }))
-      .sort((a, b) => {
-        if (a.title === "Today") return -1;
-        if (b.title === "Today") return 1;
-        if (a.title === "Yesterday") return -1;
-        if (b.title === "Yesterday") return 1;
-        return new Date(b.title).getTime() - new Date(a.title).getTime();
-      });
-  };
-
-  const sections = groupNotificationsByDate(currentItems);
-
-  const renderSectionHeader = ({ section }: any) => (
-    <View className="px-5 py-2 mb-4 mt-3 bg-[#3A327B]">
-      <Text className="text-sm font-semibold text-white uppercase tracking-wide">
-        {section.title}
-      </Text>
-    </View>
-  );
-
-  const renderEmpty = (
-    <View className="flex-1 items-center justify-center">
-      <MaterialIcons
-        name={showSnoozed ? "schedule" : "notifications-none"}
-        size={64}
-        color="white"
-        style={{ marginBottom: 16 }}
-      />
-      <Text className="text-white text-lg font-semibold mb-1">
-        {showSnoozed ? "Snoozed Notifications" : "Notifications"}
-      </Text>
-      <Text className="text-[#999] text-base">
-        {showSnoozed
-          ? "No snoozed notifications yet."
-          : "No notifications yet."}
-      </Text>
-    </View>
-  );
-
-  const NotificationItem = ({
-    item,
-  }: {
-    item: NotificationItem | SnoozedNotification;
-  }) => {
-    const [showMenu, setShowMenu] = useState(false);
-
-    const isSnoozed = "snoozed_at" in item;
-
-    const handleMenuAction = async (action: "snooze" | "delete") => {
-      setShowMenu(false);
-      if (action === "snooze" && !isSnoozed) {
-        await snoozeNotification(item as NotificationItem, 1);
-        Toast.show({
-          type: "success",
-          text1: "Notification snoozed for 1 hour",
-        });
-      } else if (action === "delete") {
-        await deleteNotificationFromAPI(item._id);
-      }
-    };
-
-    const deleteNotificationFromAPI = async (notificationId: string) => {
-      if (!token) return;
-      try {
-        await deleteNotification(token, notificationId);
-        await getNotifications(token);
-        Toast.show({
-          type: "success",
-          text1: "Notification deleted successfully",
-        });
-        // Refresh the lists
-        load();
-        if (showSnoozed) loadSnoozed();
-      } catch (error) {
-        console.error("Failed to delete notification:", error);
-      }
-    };
-
-    return (
-      <View className="flex-1 px-5 mb-4">
-        <TouchableOpacity
-          onPress={() => !isSnoozed && handleNudgeAction(item._id)}
-        >
-          <View className="bg-black/15 rounded-2xl px-5 py-3 border border-white/15">
-            <View className="flex-row justify-between items-start">
-              <View className="flex-1 pr-4">
-                <Text className="text-white text-lg font-semibold mb-2">
-                  {item.title}
-                </Text>
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-white text-sm">
-                    {formatUtcToIstTime(item.created_at || "")}
-                  </Text>
-                </View>
-                {isSnoozed && (
-                  <TouchableOpacity
-                    className="mt-3 self-start bg-[#C6BFFF] px-4 py-2 rounded-lg"
-                    onPress={() => unsnoozeNotification(item._id)}
-                  >
-                    <Text className="text-white text-sm font-semibold">
-                      Unsnooze
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* 3-dot menu button */}
-              <TouchableOpacity
-                onPress={() => setShowMenu(!showMenu)}
-                className="p-2 bg-white/15 rounded-full"
-                style={{
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 2,
-                  elevation: 1,
-                }}
-              >
-                <MaterialIcons name="more-vert" size={18} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Dropdown menu */}
-        {showMenu && (
-          <View
-            className="absolute top-14 right-3 bg-white rounded-xl shadow-lg border border-gray-200 z-20"
-            style={{
-              minWidth: 140,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-              elevation: 8,
-            }}
-          >
-            {!isSnoozed && (
-              <TouchableOpacity
-                className="px-4 py-3 border-b border-gray-100 flex-row items-center"
-                onPress={() => handleMenuAction("snooze")}
-              >
-                <MaterialIcons
-                  name="schedule"
-                  size={16}
-                  color="#6B7280"
-                  style={{ marginRight: 8 }}
-                />
-                <Text className="text-gray-700 text-sm font-medium">
-                  Snooze
-                </Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              className="px-4 py-3 flex-row items-center"
-              onPress={() => handleMenuAction("delete")}
-            >
-              <MaterialIcons
-                name="delete"
-                size={16}
-                color="#EF4444"
-                style={{ marginRight: 8 }}
-              />
-              <Text className="text-red-600 text-sm font-medium">Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  const renderNotificationItem = ({
-    item,
-  }: {
-    item: NotificationItem | SnoozedNotification;
-  }) => <NotificationItem item={item} />;
+  const flatListData = sectionKeys.flatMap((section) => [
+    { type: "header", id: section, title: section },
+    ...grouped[section].map((n: NItem) => ({ type: "item", ...n })),
+  ]);
 
   return (
     <View className="flex-1 bg-[#3A327B]">
-      {/* Header */}
-      <View className="flex-row items-center justify-center px-5 mt-16">
-        <Text className="text-2xl font-medium text-white">
-          {showSnoozed ? "Snoozed Notifications" : "Notifications"}
-        </Text>
-      </View>
-      <View className="absolute top-6 right-7">
-        <TouchableOpacity onPress={() => setShowSnoozed(!showSnoozed)}>
-          <View className="bg-white/15 rounded-full p-2">
-            {showSnoozed ? (
-              <MaterialIcons name="notifications" size={24} color="white" />
-            ) : (
-              <MaterialIcons name="snooze" size={24} color="white" />
-            )}
-          </View>
+      {/* SCREEN HEADER */}
+      <View className="flex-row gap-4 items-center justify-center w-full mt-16 mb-6">
+        <TouchableOpacity
+          className="absolute left-5"
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
+
+        <Text className="text-white text-3xl font-semibold">Notifications</Text>
       </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
-        ListEmptyComponent={!loading ? renderEmpty : null}
-        renderItem={renderNotificationItem}
-        renderSectionHeader={renderSectionHeader}
-        stickySectionHeadersEnabled={false}
+      {/* LIST */}
+      <FlatList
+        data={flatListData}
+        keyExtractor={(item) => item._id || item.id}
+        renderItem={({ item }) => {
+          if (item.type === "header") {
+            return (
+              <Text className="px-6 py-2 text-white/70 font-semibold uppercase tracking-wide">
+                {item.title}
+              </Text>
+            );
+          }
+
+          return (
+            <NotificationCards
+              item={item}
+              onDelete={deleteNotificationById}
+              onNudge={handlePress}
+            />
+          );
+        }}
+        contentContainerStyle={{ paddingBottom: 60 }}
       />
 
+      {/* LOADING OVERLAY */}
       {loading && (
-        <View className="absolute top-0 left-0 right-0 bottom-0 justify-center items-center bg-black/50">
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text className="mt-4 text-white">Processing...</Text>
+        <View className="absolute inset-0 justify-center items-center bg-black/40">
+          <ActivityIndicator size="large" color="#fff" />
         </View>
       )}
     </View>

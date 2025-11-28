@@ -1,14 +1,15 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import { useCallback, useEffect, useState } from "react";
 import { getNetworkingPlaybook, PlaybookResponse } from "@/api/journal";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function PlaybookDetailScreen() {
   const { id } = useLocalSearchParams();
   const [playbook, setPlaybook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
 
   const loadPlaybook = useCallback(async () => {
     try {
@@ -33,31 +34,44 @@ export default function PlaybookDetailScreen() {
 
   return (
     <View className="flex-1 bg-[#3A327B] justify-start">
-      <View className="flex-row gap-4 items-center justify-center w-full mt-16">
-        <TouchableOpacity
-          className="absolute left-5"
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text className="text-white text-3xl font-semibold">Playbook</Text>
+      <View className="pt-12 px-6 bg-[#3A327B]">
+        <View className="flex-row items-center justify-between">
+          
+          {/* Back Button */}
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={26} color="white" />
+          </TouchableOpacity>
+
+          {/* Title Block */}
+          <View className="flex-1 flex-row items-center justify-center ml-[-26px]">
+            <View className="bg-gradient-to-br from-purple-400 to-pink-400 p-3 rounded-full mr-3">
+              <Ionicons name="people" size={26} color="white" />
+            </View>
+
+            <View>
+              <Text className="text-white text-2xl font-semibold text-center">
+                {playbook?.header?.title || playbook?.title}
+              </Text>
+
+              <Text className="text-purple-200 text-base font-medium text-center -mt-1">
+                {playbook?.header?.subtitle || playbook?.subtitle}
+              </Text>
+            </View>
+          </View>
+
+          {/* Spacer for symmetry */}
+          <View style={{ width: 26 }} />
+        </View>
       </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 80 }}
+        ref={scrollRef}
       >
         {/* Header Section */}
-        <View className="mt-5 mb-8 items-center px-6">
-          <View className="bg-gradient-to-br from-purple-400 to-pink-400 p-4 rounded-full mb-4">
-            <Ionicons name="people" size={40} color="white" />
-          </View>
-          <Text className="text-white text-3xl font-semibold text-center">
-            {playbook?.header?.title || playbook?.title}
-          </Text>
-          <Text className="text-purple-200 text-lg font-medium mt-1">
-            {playbook?.header?.subtitle || playbook?.subtitle}
-          </Text>
+        <View className="mb-2 items-center px-6">
           <Text className="text-purple-100 text-center mt-2">
             {playbook?.header?.description}
           </Text>
@@ -108,17 +122,25 @@ export default function PlaybookDetailScreen() {
         </View>
 
         {/* Smart Nudging Support */}
-        <View className="bg-white mx-5 mt-8 rounded-3xl p-6 shadow-md mb-8">
-          <Text className="text-purple-600 font-semibold mb-3 text-lg">
-            ─ Smart Nudging Support
-          </Text>
+        <View className="bg-white mx-5 mt-8 rounded-3xl p-6 shadow-md mb-8 opacity-40">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-purple-600 font-semibold text-lg">
+              ─ Smart Nudging Support
+            </Text>
+
+            <View className="bg-purple-200 px-3 py-1 rounded-full">
+              <Text className="text-purple-700 font-semibold text-xs">
+                Coming Soon
+              </Text>
+            </View>
+          </View>
 
           <View className="bg-amber-50 border border-amber-100 rounded-xl p-4">
             <View className="flex-row items-center mb-3">
-              <View className="bg-amber-400/80 p-2 rounded-full mr-3">
+              <View className="bg-amber-400/60 p-2 rounded-full mr-3">
                 <Ionicons name="notifications" size={18} color="white" />
               </View>
-              <Text className="font-semibold text-gray-900 text-base">
+              <Text className="font-semibold text-gray-700 text-base">
                 Automated Reminders
               </Text>
             </View>
@@ -131,6 +153,7 @@ export default function PlaybookDetailScreen() {
             ))}
           </View>
         </View>
+
 
         {/* Bottom Badge */}
         <View className="items-center mt-4">

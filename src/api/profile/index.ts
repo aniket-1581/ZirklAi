@@ -197,8 +197,7 @@ export async function getNudges(token: string) {
   const res = await fetch(`${BASE_URL}/profile/nudge-data`, {
     headers: {
       Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json"
+      Accept: "application/json"
     },
   });
   if (!res.ok) throw new Error("Failed to fetch nudges");

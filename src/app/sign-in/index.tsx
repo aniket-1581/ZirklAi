@@ -100,7 +100,7 @@ export default LoginScreen;
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 40,
   },
   logo: {

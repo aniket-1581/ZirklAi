@@ -1,144 +1,117 @@
-import React, { useEffect, useRef } from "react";
-import { View, Animated, Easing } from "react-native";
-import Svg, { Line } from "react-native-svg";
+import React, { useEffect } from "react";
+import { View } from "react-native";
+import Svg, { Path } from "react-native-svg";
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  withRepeat,
+  Easing,
+} from "react-native-reanimated";
 
-const BAR_COUNT = 100;
-const BAR_WIDTH = 2;
-const BAR_GAP = 1;
-const COLORS = ["#e44039", "#435fb2", "#802b90", "#af3169"];
-const NORMAL_HEIGHT_FACTOR = 0.3;
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-interface WaveAnimationProps {
-  height: number;
+interface Props {
+  amplitude: number;
   width: number;
-  isActive: boolean;
+  height: number;
 }
 
-function getRandomHeight(height: number) {
-  return Math.random() * (height * 0.65) + height * 0.3;
-}
+export default function WaveAnimation({ amplitude, width, height }: Props) {
+  const phase = useSharedValue(0);
 
-export default function WaveAnimation({
-  height,
-  width,
-  isActive,
-}: WaveAnimationProps) {
-  const animatedValues = useRef(
-    Array.from(
-      { length: BAR_COUNT },
-      () => new Animated.Value(getRandomHeight(height))
-    )
-  ).current;
-
-  // To store currently running animation refs per bar
-  const runningAnimations = useRef<(Animated.CompositeAnimation | null)[]>(
-    new Array(BAR_COUNT).fill(null)
-  );
-
-  // Animate bar with a recursive loop, storing Animations in runningAnimations
-  function animateBar(idx: number) {
-    const animation = Animated.timing(animatedValues[idx], {
-      toValue: getRandomHeight(height),
-      duration: 220,
-      useNativeDriver: false,
-      easing: Easing.linear,
-    });
-
-    runningAnimations.current[idx] = animation;
-
-    animation.start(({ finished }) => {
-      if (finished && isActive) {
-        animateBar(idx);
-      } else {
-        // Clear animation reference if not finished or isActive false
-        runningAnimations.current[idx] = null;
-      }
-    });
-  }
+  const a1 = useSharedValue(0); // big
+  const a2 = useSharedValue(0); // medium
+  const a3 = useSharedValue(0); // small
 
   useEffect(() => {
-    if (isActive) {
-      // Start animation loops for all bars
-      for (let i = 0; i < BAR_COUNT; i++) {
-        animateBar(i);
-      }
-    } else {
-      // Stop all ongoing animations
-      runningAnimations.current.forEach((anim) => {
-        if (anim) anim.stop();
-      });
+    // continuous animation
+    phase.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.linear }),
+      -1,
+      false
+    );
 
-      // Clear all stored animation refs
-      runningAnimations.current = new Array(BAR_COUNT).fill(null);
+    a1.value = withTiming(amplitude * 1.5, { duration: 300 });
+    a2.value = withTiming(amplitude * 1, { duration: 350 });
+    a3.value = withTiming(amplitude * 0.5, { duration: 400 });
+  }, [amplitude]);
 
-      // Reset bar heights to normal factor smoothly
-      const resetAnimations = animatedValues.map((val, idx) =>
-        Animated.timing(val, {
-          toValue: animatedValues[idx],
-          duration: 300,
-          useNativeDriver: false,
-          easing: Easing.out(Easing.cubic),
-        })
-      );
+  /**
+   * Create wave for LEFT / CENTER / RIGHT with controlled overlap
+   */
+  const createWave = (ampShared: any, position: "left" | "center" | "right") =>
+    useAnimatedProps(() => {
+      "worklet";
 
-      Animated.parallel(resetAnimations).start();
-    }
-    // Cleanup function to stop animations on unmount or dependencies change
-    return () => {
-      runningAnimations.current.forEach((anim) => {
-        if (anim) anim.stop();
-      });
-      runningAnimations.current = new Array(BAR_COUNT).fill(null);
-    };
-  }, [isActive, animatedValues, height]);
+      const midY = height / 2;
+
+      // Overlap system:
+      // Each wave width = totalWidth * 0.75 (bigger than section width → overlap)
+      const waveWidth = width * 0.10;
+
+      let leftOffset = 2;
+
+      if (position === "left") leftOffset = width * 0.40;
+      if (position === "center") leftOffset = width * 0.45; // overlap 50%
+      if (position === "right") leftOffset = width * 0.50; // overlap 50%
+
+      const right = leftOffset + waveWidth;
+
+      // amplitude scaling
+      const A = ampShared.value * (height * 0.45);
+      const t = phase.value * Math.PI * 2;
+      const wobble = Math.sin(t) * 0.4 + 0.6;
+
+      const p1 = leftOffset + waveWidth * 0.25;
+      const p2 = leftOffset + waveWidth * 0.5;
+      const p3 = leftOffset + waveWidth * 0.75;
+
+      const top1 = midY - A * wobble;
+      const top2 = midY - A;
+      const top3 = midY - A * wobble;
+
+      const bottom1 = midY + A * wobble;
+      const bottom2 = midY + A;
+      const bottom3 = midY + A * wobble;
+
+      let d = "";
+      d += `M ${leftOffset} ${midY}`;
+      d += ` C ${p1} ${top1}, ${p2} ${top2}, ${p3} ${top3}`;
+      d += ` S ${right} ${midY}, ${right} ${midY}`;
+
+      // mirrored bottom
+      d += ` C ${p3} ${bottom3}, ${p2} ${bottom2}, ${p1} ${bottom1}`;
+      d += ` S ${leftOffset} ${midY}, ${leftOffset} ${midY} Z`;
+
+      return { d };
+    });
+  
+  const waveLeft = createWave(a1, "left");
+  const waveCenter = createWave(a2, "center");
+  const waveRight = createWave(a3, "right");
 
   return (
-    <View className="flex items-center justify-center w-full">
-      <Svg height={height} width={width}>
-        {[...Array(BAR_COUNT)].map((_, i) => {
-          const x = i * (BAR_WIDTH + BAR_GAP);
-          const color = COLORS[i % COLORS.length];
-          return (
-            <AnimatedLine
-              key={i}
-              x={x}
-              animatedHeight={animatedValues[i]}
-              color={color}
-              height={height}
-            />
-          );
-        })}
+    <View>
+      <Svg width={width} height={height}>
+        <Path
+          d={`M 0 ${height/2} L ${width} ${height/2}`}
+          stroke="rgba(230,125,200,0.60)"
+          strokeWidth="2"
+        />
+        <AnimatedPath
+          animatedProps={waveLeft}
+          fill="rgba(150,138,238,0.60)"
+        />
+        <AnimatedPath
+          animatedProps={waveCenter}
+          fill="rgba(228,185,228,0.60)"
+        />
+        <AnimatedPath
+          animatedProps={waveRight}
+          fill="rgba(230,125,200,0.60)"
+        />
       </Svg>
     </View>
   );
 }
-
-function AnimatedLine({
-  x,
-  animatedHeight,
-  color,
-  height,
-}: {
-  x: number;
-  animatedHeight: Animated.Value;
-  color: string;
-  height: number;
-}) {
-  const y1 = Animated.divide(Animated.subtract(height, animatedHeight), 2);
-  const y2 = Animated.add(y1, animatedHeight);
-
-  return (
-    <AnimatedLineImpl
-      x1={x}
-      y1={y1}
-      x2={x}
-      y2={y2}
-      stroke={color}
-      strokeWidth={BAR_WIDTH}
-      strokeLinecap="round"
-      opacity={0.85}
-    />
-  );
-}
-
-const AnimatedLineImpl = Animated.createAnimatedComponent(Line);

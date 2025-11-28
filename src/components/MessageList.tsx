@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Keyboard } from 'react-native';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Keyboard, Text, TouchableOpacity, View } from 'react-native';
 import { Message, Option } from '../types';
 
 interface MessageListProps {
@@ -68,7 +68,7 @@ export default function MessageList({
     <FlatList
       data={messages}
       keyExtractor={(_, idx) => idx.toString()}
-      className='flex-1 px-5 pt-4'
+      className='flex-1 px-6 pt-4'
       showsVerticalScrollIndicator={false}
       ref={flatListRef}
       keyboardShouldPersistTaps='handled'
@@ -77,7 +77,7 @@ export default function MessageList({
         const isSystem = item.role === 'assistant';
         return (
           <View className={`mb-4 ${isSystem ? 'items-start' : 'items-end'}`}>
-            <View className={`max-w-[80%] border ${isSystem ? 'bg-[#F6F4FF] border-[#DADADA]' : 'bg-white border-[#E2E2E2]'} rounded-2xl px-5 py-3`}>
+            <View className={`max-w-[80%] border ${isSystem ? 'bg-[#F6F4FF] border-[#DADADA]' : 'bg-white border-[#E2E2E2]'} rounded-2xl px-6 py-3`}>
               <Text className={`text-base text-black`}>
                 {item.content}
               </Text>
@@ -106,7 +106,7 @@ export default function MessageList({
                       key={`option-${index}-${optionIndex}-${optionText}`}
                       onPress={() => onOptionSelect(option)}
                       disabled={isWaitingForResponse || item.next_step !== currentStep}
-                      className={`bg-[#444A8E] rounded-lg px-5 py-3 ${isWaitingForResponse ? 'opacity-50' : ''}`}
+                      className={`bg-[#444A8E] rounded-lg px-6 py-3 ${isWaitingForResponse ? 'opacity-50' : ''}`}
                     >
                       <Text className="text-white text-start font-medium">{optionText}</Text>
                     </TouchableOpacity>
@@ -116,7 +116,7 @@ export default function MessageList({
             )}
 
             {item.next_step === 'connect_contacts' && (
-              <TouchableOpacity onPress={onContactSync} className="bg-[#444A8E] rounded-lg px-5 py-3 mt-4 flex-row items-center justify-between" disabled={item.next_step !== currentStep}>
+              <TouchableOpacity onPress={onContactSync} className="bg-[#444A8E] rounded-lg px-6 py-3 mt-4 flex-row items-center justify-between" disabled={item.next_step !== currentStep}>
                 <View className="flex-row items-center">
                   <AntDesign name="contacts" size={18} color="white" style={{ marginRight: 8 }} />
                   <Text className="text-white text-start font-medium">Connect phone-book </Text>
@@ -126,7 +126,7 @@ export default function MessageList({
             )}
 
             {(item.next_step === 'select_contacts') && (
-              <TouchableOpacity onPress={onContactSelection} className="bg-[#444A8E] rounded-lg px-5 py-3 mt-4 flex-row items-center justify-between" disabled={item.next_step !== currentStep}>
+              <TouchableOpacity onPress={onContactSelection} className="bg-[#444A8E] rounded-lg px-6 py-3 mt-4 flex-row items-center justify-between" disabled={item.next_step !== currentStep}>
                 <View className="flex-row items-center">
                   <MaterialIcons name="person-add" size={20} color="white" style={{ marginRight: 8 }} />
                   <Text className="text-white text-start font-medium">Select contacts for your </Text>
@@ -136,7 +136,7 @@ export default function MessageList({
             )}
 
             {item.next_step === 'complete' && isSystem && (
-              <TouchableOpacity onPress={onComplete} className="bg-[#444A8E] rounded-lg px-5 py-3 mt-4 flex-row items-center justify-between">
+              <TouchableOpacity onPress={onComplete} className="bg-[#444A8E] rounded-lg px-6 py-3 mt-4 flex-row items-center justify-between">
                 <Text className='text-white'>Let&apos;s Start</Text>
               </TouchableOpacity>
             )}

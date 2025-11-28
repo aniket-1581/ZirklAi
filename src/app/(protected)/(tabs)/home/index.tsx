@@ -1,26 +1,29 @@
+import { CalendarEventListResponse, getCalendarEvents } from "@/api/calendar";
 import {
   getNetworkingPlaybook,
   NetworkingPlaybookRespnse,
 } from "@/api/journal";
 import { getNotes } from "@/api/notes";
 import { getPhoneContacts } from "@/api/profile";
+import ModalInfo from "@/components/businessCard/ModalInfo";
 import ContactPlanCard from "@/components/home/ContactPlanCard";
 import EventCard from "@/components/home/EventCard";
 import PlanCard from "@/components/home/PlanCard";
+import QuickStartModal from "@/components/home/QuickStartModal";
 import { quickStartOptions } from "@/constants";
 import { useAuth } from "@/context/AuthContext";
-import { useCalendar } from "@/hooks/useCalendar";
 import { useNudges } from "@/hooks/useNudges";
 import { Contact } from "@/types";
 import { getGreetingByIST, getGrowthMessageOnce } from "@/utils/date";
-import { ImageIcons } from "@/utils/ImageIcons";
-import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { handleContactData, processBusinessCard } from "@/utils/ScannerService";
+import { launchScanner } from "@dariyd/react-native-document-scanner";
+import { Feather, FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Image,
-  ImageBackground,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -28,17 +31,24 @@ import {
 } from "react-native";
 
 export default function Home() {
-  const { events, getEvents } = useCalendar();
   const [showMenu, setShowMenu] = useState(false);
+  const [events, setEvents] = useState<CalendarEventListResponse>({
+    calendar_events: [],
+    total_count: 0,
+  });
   const [displayedContacts, setDisplayedContacts] = useState<any[]>([]);
-  const [notesContacts, setNotesContacts] = useState<any[]>([]);
   const [phoneContacts, setPhoneContacts] = useState<Contact[]>([]);
+  const [showQuickStart, setShowQuickStart] = useState(false);
+  const [quickStartData, setQuickStartData] = useState(null);
   const [networkingPlaybook, setNetworkingPlaybook] = useState<
     NetworkingPlaybookRespnse["playbooks"]
   >([]);
   const { nudges, fetchNudges, deleteNudgeById } = useNudges();
   const { token, user } = useAuth();
-  const growthMessage = useMemo(() => getGrowthMessageOnce(), []); 
+  const growthMessage = useMemo(() => getGrowthMessageOnce(), []);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalInfo, setModalInfo] = useState<any>(null);
 
   const handleDeleteNudge = async (nudgeId: string) => {
     if (!token) return;
@@ -65,7 +75,6 @@ export default function Home() {
     try {
       // Fetch notes (In my network)
       const notes = await getNotes(token);
-      setNotesContacts(notes || []);
 
       // Fetch phone contacts (Outside my network)
       const phoneData = await getPhoneContacts(token);
@@ -83,7 +92,6 @@ export default function Home() {
       setPhoneContacts(filteredPhoneContacts);
     } catch (e: any) {
       console.error("Failed to fetch data", e);
-      setNotesContacts([]);
       setPhoneContacts([]);
     }
   }, [token]);
@@ -99,6 +107,70 @@ export default function Home() {
     }
   }, []);
 
+  const getEvents = useCallback(async () => {
+    if (!token) return;
+    try {
+      const events = await getCalendarEvents(token);
+      setEvents(events);
+    } catch (e: any) {
+      console.error("Failed to fetch events", e);
+      setEvents({
+        calendar_events: [],
+        total_count: 0,
+      });
+    }
+  }, [token]);
+
+  // Business Card Scanner
+  // New function to handle image selection
+  const handleImageSelection = async () => {
+    setLoading(true);
+
+    try {
+      // Launch native auto document scanner
+      const result = await launchScanner({
+        quality: 1
+      });
+      console.log("Scanner result:", result);
+
+      if (result.didCancel) {
+        setLoading(false);
+        return;
+      }
+
+      if (result.error) {
+        console.log("Scanner error:", result.errorMessage);
+        Alert.alert("Error", "Failed to scan document");
+        setLoading(false);
+        return;
+      }
+
+      if (!result.images || result.images.length === 0) {
+        Alert.alert("Scan Failed", "No image captured");
+        setLoading(false);
+        return;
+      }
+      if (!result.didCancel && result.images[0]) {
+        setModalVisible(true);
+        const res = await processBusinessCard(result.images[0].uri, token!);
+        if (res) {
+          const { contactInfo } = await handleContactData(res);
+          showContactOptions(contactInfo, res);
+        }
+      }
+
+    } catch (error) {
+      console.error("Scanner error:", error);
+      Alert.alert("Error", "Failed to scan card");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showContactOptions = (formattedInfo: string, contactData: any) => {
+    setModalInfo({ formattedInfo, contactData });
+  };
+
   // Refetch data when screen comes into focus (tab is selected)
   useFocusEffect(
     useCallback(() => {
@@ -107,6 +179,7 @@ export default function Home() {
       if (token) {
         fetchNetworkingPlaybook();
         fetchNudges(token);
+        getEvents();
       }
     }, [getEvents, fetchNudges, token, fetchContact, fetchNetworkingPlaybook])
   );
@@ -115,62 +188,49 @@ export default function Home() {
     shuffleContacts();
   }, [phoneContacts]);
 
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+
   return (
     <View className="flex-1 bg-[#3A327B]">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        onScrollBeginDrag={() => setShowMenu(false)}
       >
         {/* Wave background with gradient overlay */}
-        <View style={{ height: 290 }}>
-          <ImageBackground
-            source={ImageIcons.HomeScreen} // your wave image
-            resizeMode="cover"
-            style={{ height: 290 }}
-          >
-            <LinearGradient
-              colors={["rgba(58, 50, 123, 0.3)", "rgba(58, 50, 123, 1)"]}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: "100%",
-              }}
-            />
-            {/* Dashboard Icon */}
-            <View className="absolute top-6 left-7">
-              <View className="bg-white/30 rounded-full p-2">
-                <TouchableOpacity onPress={() => setShowMenu((prev) => !prev)}>
-                  <MaterialIcons name="dashboard" color="white" size={24} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            {/* Notification Icon */}
-            <View className="absolute top-6 right-7">
-              <TouchableOpacity
-                onPress={() => router.push("/(protected)/(tabs)/notifications")}
-              >
-                <View className="bg-white/30 rounded-full p-2">
-                  <MaterialIcons name="notifications" color="white" size={24} />
-                </View>
+        <View>
+          {/* Dashboard Icon */}
+          <View className="absolute top-7 left-6">
+            <View className="bg-white/30 rounded-full p-2">
+              <TouchableOpacity onPress={() => setShowMenu((prev) => !prev)}>
+                <MaterialIcons name="dashboard" color="white" size={20} />
               </TouchableOpacity>
             </View>
-            {/* Zirkl Text */}
-            <View className="flex-1 items-center justify-start pt-16">
-              <Text className="text-white text-2xl font-bold">Zirkl</Text>
-            </View>
-          </ImageBackground>
+          </View>
+          {/* Notification Icon */}
+          <View className="absolute top-7 right-6">
+            <TouchableOpacity
+              onPress={() => router.push("/(protected)/(tabs)/notifications")}
+            >
+              <View className="bg-white/30 rounded-full p-2">
+                <MaterialIcons name="notifications" color="white" size={20} />
+              </View>
+            </TouchableOpacity>
+          </View>
+          {/* Zirkl Text */}
+          <View className="flex-1 items-center justify-start pt-16">
+            <Text className="text-white text-2xl font-bold">Zirkl</Text>
+          </View>
         </View>
 
         {/* Greeting Text */}
-        <View className="px-5">
+        <View className="px-6 pt-10">
           <Text className="text-xl font-bold text-white mb-3">
             {getGreetingByIST()}, {user?.full_name.split(" ")[0]}
           </Text>
-          <Text className="text-white text-base mb-4">
-            {growthMessage}
-          </Text>
+          <Text className="text-white text-base mb-4">{growthMessage}</Text>
           <TouchableOpacity
             className="bg-black/15 flex-row gap-2 items-center justify-center rounded-xl py-3 border border-white/15"
             onPress={() => router.push("/(protected)/(tabs)/chats")}
@@ -183,14 +243,17 @@ export default function Home() {
         </View>
 
         {/* Quick Start Options */}
-        <View className="px-5 pb-2 mt-9">
+        <View className="px-6 pb-2 mt-9">
           <Text className="text-lg font-bold text-white mb-3">Quick Start</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {quickStartOptions.map((option, index) => (
               <TouchableOpacity
                 key={index}
-                onPress={() => option.action()}
                 className="items-center mr-5"
+                onPress={() => {
+                  setQuickStartData(option.knowMore as any);
+                  setShowQuickStart(true);
+                }}
               >
                 <View className="flex gap-3 items-start">
                   <Image
@@ -206,11 +269,28 @@ export default function Home() {
           </ScrollView>
         </View>
 
-        {/* Plan Today Section */}
-        <View className="px-5 mt-[60px]">
+        {/* Combined Calendar + Follow-Ups Section */}
+        <View className="px-6 mt-[60px]">
+          <Text className="text-lg font-bold text-white mb-3">
+            Follow-Ups & Calendar
+          </Text>
+
+          <EventCard
+            items={[
+              ...events.calendar_events.map((e) => ({ ...e, type: "followup" })),
+              ...nudges.map((n) => ({ ...n, type: "nudge" })),
+            ]}
+            type="combined"
+            emptyMessage="No events or follow-ups available"
+            handleDeleteNudge={handleDeleteNudge}
+          />
+        </View>
+
+        {/* You may want to reach out */}
+        <View className="px-6 mt-[60px]">
           <View className="flex-row justify-between items-center mb-5">
             <Text className="text-lg font-bold text-white">
-              You may want to reach out
+              Discover lost connections
             </Text>
             <TouchableOpacity
               className="items-center"
@@ -222,24 +302,8 @@ export default function Home() {
           <ContactPlanCard item={displayedContacts} />
         </View>
 
-        {/* Combined Calendar + Follow-Ups Section */}
-        <View className="px-5 mt-[60px]">
-          <Text className="text-lg font-bold text-white mb-3">
-            Follow-Ups & Calendar
-          </Text>
-
-          <EventCard
-            items={[...events.map(e => ({ ...e, type: 'followup' })), 
-                    ...nudges.map(n => ({ ...n, type: 'nudge' }))]}
-            type="combined"
-            emptyMessage="No events or follow-ups available"
-            handleDeleteNudge={handleDeleteNudge}
-          />
-        </View>
-
-
         {/* Playbook Section */}
-        <View className="px-5 mt-[60px]">
+        <View className="px-6 mt-[60px]">
           <Text className="text-lg font-bold text-white mb-3">
             Networking Playbook
           </Text>
@@ -248,7 +312,6 @@ export default function Home() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: 24 }}
           >
             {networkingPlaybook.map((playbook: any, index: number) => {
               const icon = playbook.icon;
@@ -272,10 +335,11 @@ export default function Home() {
                     colors={gradientColors}
                     style={{
                       flex: 1,
-                      width: 130,
+                      width: 140,
                       height: "auto",
                       flexDirection: "column",
                       justifyContent: "space-between",
+                      rowGap: 20,
                       alignItems: "center",
                       borderRadius: 10,
                       padding: 10,
@@ -295,27 +359,23 @@ export default function Home() {
                           alignItems: "center",
                           borderRadius: 9999,
                           borderWidth: 1,
-                          borderColor: "#fff"
+                          borderColor: "#fff",
                         }}
                       >
-                        <Feather
-                          name={icon}
-                          size={24}
-                          color="white"
-                        />
+                        <Feather name={icon} size={24} color="white" />
                       </LinearGradient>
                     </View>
 
                     {/* Title + Subtitle */}
                     <View className="mt-1">
                       <Text
-                        className="text-black font-semibold text-[15px]"
+                        className="text-black text-center font-semibold text-[15px]"
                         numberOfLines={2}
                       >
                         {playbook.title}
                       </Text>
                       <Text
-                        className="text-black/80 text-[13px] mt-1"
+                        className="text-black/80 text-center text-[13px] mt-1"
                         numberOfLines={1}
                       >
                         {playbook.subtitle}
@@ -329,40 +389,49 @@ export default function Home() {
         </View>
 
         {/* Plan Today Section */}
-        <View className="px-5 mt-[60px] mb-10">
+        <View className="px-6 mt-[60px] mb-10">
           <Text className="text-lg font-bold text-white mb-5">
             Here is the plan today
           </Text>
 
           {(() => {
-            const today = new Date();
-            const todayDate = today.toISOString().split("T")[0]; // Format: YYYY-MM-DD
+            const now = new Date();
+            const startOfDay = new Date(
+              now.getFullYear(),
+              now.getMonth(),
+              now.getDate(),
+              0, 0, 0, 0
+            ).getTime();
+
+            const endOfDay = new Date(
+              now.getFullYear(),
+              now.getMonth(),
+              now.getDate(),
+              23, 59, 59, 999
+            ).getTime();
+
 
             // Filter today's nudges
             const todayNudges = nudges
               .filter((n) => {
-                const nudgeDate = n.created_at?.split("T")[0];
-                return nudgeDate === todayDate;
+                const created = new Date(n.created_at).getTime();
+                return created >= startOfDay && created <= endOfDay;
               })
-              .map((n) => ({
-                ...n,
-                type: "nudge"
-              }));
+              .map((n) => ({ ...n, type: "nudge" }));
 
             // Filter today's events
-            const todayEvents = events
+            const todayEvents = events.calendar_events
               .filter((e) => {
-                const eventDate = new Date(e.startDate).toISOString().split("T")[0];
-                return eventDate === todayDate;
+                const start = new Date(e.startDate).getTime();
+                return start >= startOfDay && start <= endOfDay;
               })
-              .map((e) => ({
-                ...e,
-                type: "followup"
-              }));
+              .map((e) => ({ ...e, type: "followup" }));
+
+
 
             // Combine & sort (optional)
-            const todayPlans = [...todayNudges, ...todayEvents].sort(
-              (a, b) => (a.type === "event" ? -1 : 1)
+            const todayPlans = [...todayNudges, ...todayEvents].sort((a, b) =>
+              a.type === "event" ? -1 : 1
             );
 
             if (todayPlans.length === 0) {
@@ -375,10 +444,11 @@ export default function Home() {
               );
             }
 
-            return todayPlans.map((plan, index) => <PlanCard key={index} item={plan} />);
+            return todayPlans.map((plan, index) => (
+              <PlanCard key={index} item={plan} />
+            ));
           })()}
         </View>
-
       </ScrollView>
       {showMenu && (
         <View
@@ -402,8 +472,30 @@ export default function Home() {
             />
             <Text className="text-gray-700 text-sm font-medium">QR Scan</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            className="px-4 py-3 flex-row items-center"
+            onPress={() => {
+              handleImageSelection();
+              setShowMenu(false);
+            }}
+          >
+            <FontAwesome5
+              name="id-card"
+              size={16}
+              color="#6B7280"
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-gray-700 text-sm font-medium">Business Card Scan</Text>
+          </TouchableOpacity>
         </View>
       )}
+      <QuickStartModal
+        visible={showQuickStart}
+        onClose={() => setShowQuickStart(false)}
+        data={quickStartData}
+      />
+
+      <ModalInfo modalVisible={modalVisible} closeModal={closeModal} modalInfo={modalInfo} loading={loading} />
     </View>
   );
 }
