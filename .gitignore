@@ -32,8 +32,18 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
 
 app-example
+
+
+# Google Service Files
+./Google-Service-Info.plist
+./google-services.json
+
+# Eas Build Files
+./eas.json
+
